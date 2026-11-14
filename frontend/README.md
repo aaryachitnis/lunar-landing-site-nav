@@ -19,6 +19,7 @@ npm run textures     # (re)generate public/textures/ from NASA source maps
 **Home route `/` — God's-eye view** (`src/pages/GlobePage/`)
 
 - **Globe:** NASA-textured Moon on a black starfield. You can orbit and zoom; panning is off. Site markers are HTML elements projected onto the globe each frame, coloured by category and hidden when on the far side. Hover shows the name.
+- **"Let there be light" button** (bottom centre of the globe): toggles a fill light that illuminates the globe's night side, fading in and out over 0.8 s. It is off by default and the choice is remembered per browser (`localStorage`). It changes only the globe's look, not the metrics.
 - **Site list (left, collapsible):** sites grouped by category, with search by name/agency and a custom lat/lon form.
 - **Site panel (right)** opens on selecting a site. Esc or ✕ closes it.
   1. Name, category, agency, notes and a "Mock data" tag.
@@ -87,6 +88,7 @@ src/
     SiteList/                  grouped list, search, custom coordinates form
     SitePanel/                 the right-hand panel (composition, time controls)
     TerrainView/               bird's-eye terrain mesh (three.js, OrbitControls)
+    LightToggle/               "Let there be light" button
     MetricTiles/               metric tiles with status indicators (icon + label, not colour alone)
     PowerChart/                recharts small multiples + daily table
   hooks/
@@ -96,6 +98,7 @@ src/
     useTerrainPatch.js         → api.getTerrainPatch(lat, lon, { sizeKm, n })
     useMoonScene.js            creates/disposes MoonScene; exposes load status
     useSelectedSite.js         ?site= / ?t= URL state + actions
+    useLetThereBeLight.js      night-side illumination toggle → MoonScene.setNightSideLit
   scene/
     config.js                  FIXED globe look + camera constants (see below)
     MoonScene.js               renderer, camera, OrbitControls, Sun, stars, moon, markers, flyTo, setInsets
@@ -126,6 +129,7 @@ src/
 | Sphere segments | 1024 × 512 |
 | Default camera | looking at lat −35°, lon 0°, distance 4 (south pole in view) |
 | Focus distance / fly duration | 2.0 / 1400 ms |
+| `NIGHT_FILL` (toggle only) | Directional light opposite the Sun (2.6) + ambient 0.35, 800 ms fade. Both are zero unless the user turns on "Let there be light". |
 
 The globe's Sun is decorative. It does not follow the selected date; the panel's metrics do.
 

@@ -14,3 +14,11 @@ export const SPHERE_SEGMENTS = [1024, 512];
 export const DEFAULT_VIEW = { lat: -35, lon: 0, distance: 4 }; // tilted so the south pole is in view
 export const FOCUS_DISTANCE = 2.0;
 export const FLY_DURATION_MS = 1400;
+
+// "Let there be light" — optional fill that illuminates the night side (toggle in the UI).
+// Off by default so the default look above (single Sun, no ambient) is unchanged.
+export const NIGHT_FILL = {
+  intensity: 2.6, // directional light opposite the Sun
+  ambient: 0.35, // softens the band where both lights graze (the terminator)
+  transitionMs: 800,
+};
