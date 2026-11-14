@@ -1,0 +1,41 @@
+.moon-view { position: absolute; inset: 0; overflow: hidden; background: #000; }
+.moon-canvas { position: absolute; inset: 0; }
+.moon-canvas canvas { display: block; }
+.moon-markers { position: absolute; inset: 0; pointer-events: none; }
+
+.site-marker {
+  position: absolute; left: 0; top: 0; visibility: hidden;
+  display: flex; align-items: center; gap: 6px;
+  margin: -9px 0 0 -9px; padding: 0; border: 0; background: none;
+  pointer-events: auto; will-change: transform;
+}
+.site-marker-dot {
+  width: 18px; height: 18px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle, var(--marker-color) 0 4px, transparent 5px);
+  border: 2px solid var(--marker-color);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  transition: transform 0.15s ease;
+}
+.site-marker-label {
+  padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+  background: rgba(26, 26, 25, 0.85); color: var(--text-primary); font-size: 12px;
+  opacity: 0; transform: translateX(-4px); transition: opacity 0.15s, transform 0.15s; pointer-events: none;
+}
+.site-marker:hover, .site-marker:focus-visible, .site-marker.selected { z-index: 2; }
+.site-marker:hover .site-marker-label,
+.site-marker:focus-visible .site-marker-label,
+.site-marker.selected .site-marker-label { opacity: 1; transform: none; }
+.site-marker:hover .site-marker-dot { transform: scale(1.2); }
+.site-marker.selected .site-marker-dot {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 0 0 5px color-mix(in srgb, var(--marker-color) 45%, transparent);
+}
+.site-marker:focus-visible { outline: none; }
+.site-marker:focus-visible .site-marker-dot { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+.moon-loading {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--text-secondary); background: #000; text-align: center; padding: 16px;
+}
+.moon-loading.error { color: var(--critical); }
+.moon-credit { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); color: var(--text-muted); font-size: 11px; pointer-events: none; white-space: nowrap; }

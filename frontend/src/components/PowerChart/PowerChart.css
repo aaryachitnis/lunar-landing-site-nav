@@ -1,0 +1,17 @@
+.power-chart h4 { margin: 8px 0 2px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.power-chart .recharts-legend-item-text { color: var(--text-secondary) !important; }
+.chart-tooltip {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.chart-tooltip-title { color: var(--text-muted); margin-bottom: 2px; }
+.chart-tooltip-row { display: grid; grid-template-columns: 10px auto auto; gap: 6px; align-items: center; color: var(--text-primary); }
+.chart-tooltip-row .tabular { text-align: right; }
+.swatch { width: 10px; height: 3px; border-radius: 2px; }
+.chart-table { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+.chart-table summary { cursor: pointer; }
+.chart-table table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+.chart-table th, .chart-table td { text-align: right; padding: 2px 6px; border-bottom: 1px solid var(--border); }
+.chart-table th:first-child, .chart-table td:first-child { text-align: left; }
+.chart-table th { color: var(--text-muted); font-weight: 500; }
+.chart-note { margin: 0 0 4px; font-size: 11px; color: var(--text-muted); }

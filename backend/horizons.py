@@ -3,7 +3,7 @@ from astroquery.jplhorizons import Horizons
 lunar_site = {
     'lon': 0.0,         # East longitude in degrees (0 to 360 or -180 to 180)
     'lat': -89.9,       # Latitude in degrees (-90 to +90)
-    'elevation': 1.5,   # Elevation in kilometers above lunar reference radius (1737.4 km)
+    'elevation': 0  ,   # Elevation in kilometers above lunar reference radius (1737.4 km)
     'body': '301'       # '301' specifies the Moon
 }
 

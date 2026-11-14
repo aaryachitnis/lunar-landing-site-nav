@@ -1,0 +1,27 @@
+{
+  "name": "lunar-site-nav-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "textures": "node scripts/fetch-textures.mjs",
+    "predev": "node scripts/fetch-textures.mjs --if-missing",
+    "dev": "vite",
+    "prebuild": "node scripts/fetch-textures.mjs --if-missing",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router-dom": "^7.18.5",
+    "recharts": "^3.10.1",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.3.0",
+    "geotiff": "^3.0.5",
+    "sharp": "^0.35.5",
+    "vite": "^8.3.8"
+  }
+}
