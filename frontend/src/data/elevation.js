@@ -19,19 +19,27 @@ export function loadElevation() {
       const res = await fetch(TEXTURE_BASE + file);
       if (!res.ok) throw new Error(`Elevation grid missing (${res.status}). Run "npm run textures".`);
       const data = new Int16Array(await res.arrayBuffer());
-      return {
-        width,
-        height,
-        pixelsPerDegree,
-        resolutionM,
-        dataset,
-        data,
-        sample: (lat, lon) => sample(data, width, height, lat, lon),
-      };
+      return makeGrid({ data, width, height, pixelsPerDegree, resolutionM, dataset });
     })();
     gridPromise.catch(() => (gridPromise = null));
   }
   return gridPromise;
+}
+
+/**
+ * Wrap a raw Int16 equirectangular grid (row 0 = 90°N, col 0 = 180°W) as a sampler.
+ * Shared with build scripts (scripts/fetch-site-terrain.mjs) that read the grid from disk.
+ */
+export function makeGrid({ data, width, height, pixelsPerDegree = width / 360, resolutionM, dataset = `LOLA ldem_${width / 360}` }) {
+  return {
+    width,
+    height,
+    pixelsPerDegree,
+    resolutionM: resolutionM ?? ((Math.PI * 1737.4) / height) * 1000,
+    dataset,
+    data,
+    sample: (lat, lon) => sample(data, width, height, lat, lon),
+  };
 }
 
 /** Bilinear elevation in metres at (lat, lon). */

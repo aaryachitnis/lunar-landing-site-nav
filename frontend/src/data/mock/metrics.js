@@ -3,7 +3,8 @@
 //   • Sun: subsolar longitude from the synodic phase (reference new moon 2000-01-06 18:14 UTC),
 //     subsolar latitude ±1.54° over the draconic year.
 //   • Earth: sub-Earth point wobbles with optical libration (±7.9° lon, ±6.7° lat).
-//   • Horizon: ray-marched from real LOLA elevation (ldem_16 or ldem_64, see fetch-textures.mjs) incl. surface curvature.
+//   • Horizon: normally passed in (api.getSiteHorizon → the same 5 m/global LOLA horizon the Horizon View
+//     renders, 0.5° steps); falls back to ray-marching the global grid here (2° steps) incl. curvature.
 //   • Power: sun-tracking panel, 2 m² at 30% efficiency, scaled by visible fraction of the solar disk.
 // Not ephemeris-grade. Output shape documented in data/SCHEMA.md.
 
@@ -59,8 +60,9 @@ export function computeHorizon(grid, lat, lon) {
   return bins;
 }
 
-const horizonAt = (bins, az) => {
-  const x = az / HORIZON_STEP_DEG;
+/** Horizon elevation (deg) at azimuth `az` from {stepDeg, elevation[]}, linearly interpolated. */
+const horizonAt = ({ stepDeg, elevation: bins }, az) => {
+  const x = az / stepDeg;
   const i = Math.floor(x) % bins.length;
   const j = (i + 1) % bins.length;
   const f = x - Math.floor(x);
@@ -71,15 +73,15 @@ const horizonAt = (bins, az) => {
 const visibleFraction = (elevAboveHorizon, r) => Math.max(0, Math.min(1, (elevAboveHorizon + r) / (2 * r)));
 
 /**
- * @param {object} grid  from loadElevation()
+ * @param {object|null} grid  from loadElevation(); only needed when no `horizon` is given
  * @param {{lat:number, lon:number}} site
  * @param {Date} date    selected time
- * @param {{daysBefore?:number, days?:number, stepH?:number}} opts
+ * @param {{daysBefore?:number, days?:number, stepH?:number, horizon?:{stepDeg:number, elevation:number[]}}} opts
  */
-export function computeSiteMetrics(grid, site, date, { daysBefore = 3, days = 30, stepH = 1 } = {}) {
+export function computeSiteMetrics(grid, site, date, { daysBefore = 3, days = 30, stepH = 1, horizon: given } = {}) {
   const lat = clampLat(site.lat);
   const basis = enuBasis(lat, site.lon);
-  const horizon = computeHorizon(grid, lat, site.lon);
+  const horizon = given ?? { stepDeg: HORIZON_STEP_DEG, elevation: computeHorizon(grid, lat, site.lon) };
   const t0 = date.getTime();
 
   const series = [];
@@ -159,7 +161,7 @@ export function computeSiteMetrics(grid, site, date, { daysBefore = 3, days = 30
       energyKWh: (mean((p) => p.powerW) * future.length * stepH) / 1000,
       longestDarknessH: longestDark,
     },
-    horizon: horizon.map((elev, k) => ({ azimuth: k * HORIZON_STEP_DEG, elevation: elev })),
+    horizon: horizon.elevation.map((elev, k) => ({ azimuth: k * horizon.stepDeg, elevation: elev })),
     series,
   };
 }
