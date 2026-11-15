@@ -1,29 +1,66 @@
 # Frontend data contract
 
-The frontend reads all data through [`api.js`](api.js). Everything is currently **mocked**
-in [`mock/`](mock/). The backend (Python) should produce data in these shapes; then each
-function in `api.js` becomes a `fetch()` with the same return value.
+Components and hooks read data only through [`api.js`](api.js). Each function's return shape
+is below.
 
-Conventions: angles in degrees; latitude −90…90 (south negative); longitude −180…180
-(east positive); times ISO 8601 UTC; azimuth clockwise from local north; elevation above
-the astronomical horizon unless the field says `AboveHorizon` (relative to the local terrain horizon).
+| Function | Source |
+|---|---|
+| `getSites()` | **Live:** backend `GET /sites`, plus display names |
+| `getSitePower(site, dateISO)` | **Live:** backend `GET /sites/{id}/metrics` (JPL Horizons) |
+| `getSkyModel(site, dateISO)` | **Mock:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
+| `getLunariumSites()` | **Mock:** Lunarium's site list in [`mock/sites.js`](mock/sites.js) |
+| `getTerrainPatch`, `getHorizonTerrain`, `getSiteHorizon` | NASA LOLA elevation data, processed in the browser |
+| `calculatePotential(params)` | Playground. **Live** backend `GET /sites/{id}/metrics` when the coordinates match a backend site, else **mock** ([`mock/engine.js`](mock/engine.js)); terrain from LOLA |
+
+Conventions: angles in degrees; latitude -90 to 90 (south negative); longitude -180 to 180 (east
+positive); times ISO 8601 UTC; azimuth clockwise from local north. Elevation is above the
+astronomical horizon unless the field says `AboveHorizon` (relative to the local terrain horizon).
 
 ## `getSites() → Site[]`
 
+The backend returns `{ id, lat, lon }`. [`siteCatalog.js`](siteCatalog.js) adds display fields by
+matching coordinates against known landing sites (within 0.05°). Unmatched sites are named
+"Site N".
+
 ```json
 {
-  "id": "shackleton-rim",
-  "name": "Shackleton Rim",
-  "lat": -89.85,
-  "lon": 160.0,
-  "category": "artemis-candidate | clps | international | apollo",
+  "id": "site-3",
+  "lat": 0.67138,
+  "lon": 23.47398,
+  "name": "Apollo 11",
+  "category": "artemis-candidate | clps | international | apollo | south-pole | other",
   "agency": "NASA",
-  "notes": "free text",
-  "mock": true
+  "notes": "Mare Tranquillitatis (1969).",
+  "terrainId": "apollo-11"
 }
 ```
 
-## `getSiteMetrics(site, dateISO) → SiteMetrics`
+`terrainId` is set for matched sites. It names the prebuilt terrain pack, and lets a Lunarium
+link (`?site=apollo-11`) select the same site on the Landing Sites tab.
+
+## `getSitePower(site, dateISO) → SitePower`
+
+Calls `GET /sites/{id}/metrics?start=…&end=…&step=2hour` for a window from 3 days before to 27
+days after `dateISO`. Power is for a flat panel, per m², with no terrain shadowing. The backend
+returns values only, so sample times are rebuilt from `start` and the step.
+
+```json
+{
+  "site": { "id": "site-3", "lat": 0.67138, "lon": 23.47398 },
+  "start": "2026-11-11T12:00:00Z",
+  "end": "2026-12-11T12:00:00Z",
+  "stepHours": 2,
+  "series": [{ "t": 1794657600000, "hoursFromSelected": -72, "wPerM2": 0 }],
+  "daily": [{ "day": -3, "kWhPerM2": 0 }],
+  "nowWPerM2": 0,
+  "totalKWhPerM2": 61.6,
+  "avgWPerM2": 86,
+  "avgSunlitDaysWPerM2": 160,
+  "source": "JPL Horizons via backend"
+}
+```
+
+## `getSkyModel(site, dateISO) → SkyModel` (mock)
 
 ```json
 {
@@ -35,21 +72,15 @@ the astronomical horizon unless the field says `AboveHorizon` (relative to the l
     "sunElevation": 1.2, "sunAzimuth": 210.5, "sunAboveHorizon": 0.8,
     "earthElevation": 4.1, "earthAzimuth": 2.3, "earthAboveHorizon": 3.6,
     "sunUp": true, "earthUp": true, "powerW": 816.6,
-    "hoursToSunrise": 410,           // hours to the next sunrise; null if not within window
-    "hoursToSunset": 52,             // hours to the next sunset; null if not within window
-    "hoursToEarthrise": 300,         // hours to the next Earthrise; null if not within window
-    "hoursToEarthset": 130           // hours to the next Earthset; null if not within window
+    "hoursToSunrise": 410, "hoursToSunset": 52,
+    "hoursToEarthrise": 300, "hoursToEarthset": 130
   },
   "window": {
-    "days": 27,
-    "illuminatedFraction": 0.82,
-    "earthVisibleFraction": 0.55,
-    "meanPowerW": 640,
-    "energyKWh": 414,
-    "longestDarknessH": 61
+    "days": 27, "illuminatedFraction": 0.82, "earthVisibleFraction": 0.55,
+    "meanPowerW": 640, "energyKWh": 414, "longestDarknessH": 61
   },
-  "horizon": [{ "azimuth": 0, "elevation": 1.4 }],          // terrain horizon profile (0.5° steps; same as HorizonTerrain.horizon)
-  "series": [{                                              // hourly, from selected −3 d to +27 d
+  "horizon": [{ "azimuth": 0, "elevation": 1.4 }],
+  "series": [{
     "t": 1794657600000, "hoursFromSelected": -72,
     "sunElevation": 1.1, "sunAzimuth": 120, "sunAboveHorizon": -0.2,
     "earthElevation": 3.9, "earthAzimuth": 1.8, "earthAboveHorizon": 3.1,
@@ -57,6 +88,10 @@ the astronomical horizon unless the field says `AboveHorizon` (relative to the l
   }]
 }
 ```
+
+- `hoursTo…` fields are `null` when the event is not within the window.
+- `series` is hourly, from 3 days before to 27 days after the selected time.
+- `powerW` is used only by Lunarium. The Landing Sites panel shows live power from `getSitePower`.
 
 ## `getTerrainPatch(lat, lon, { sizeKm, n }) → TerrainPatch`
 
@@ -66,7 +101,7 @@ column 0 = west edge). `heights` is row-major, metres relative to the 1737.4 km 
 ```json
 {
   "sizeKm": 80, "n": 64, "spacingM": 1270,
-  "heights": "Float32Array(n*n) — JSON: number[]",
+  "heights": "Float32Array(n*n)",
   "minM": -4200, "maxM": 1900, "meanM": -310,   // min / max / mean altitude over the whole patch
   "centerElevationM": 1450,
   "meanSlopeDeg": 4.2,                          // over the central area (centralKm)
@@ -79,10 +114,9 @@ column 0 = west edge). `heights` is row-major, metres relative to the 1737.4 km 
 
 ## `getHorizonTerrain(site) → HorizonTerrain` and `getSiteHorizon(site) → Horizon`
 
-First-person terrain for the Horizon View (`/horizon`) plus the **terrain horizon**. This one
-horizon drives *both* the Horizon View and `getSiteMetrics` (`sunAboveHorizon`, `illumination`,
-`powerW`, `earthVisible`), so the 3D view and the dashboard numbers always agree. A backend that
-returns metrics should use the same horizon (or also return it here).
+First-person terrain for Lunarium (`/lunarium`) plus the **terrain horizon**. The same horizon
+feeds `getSkyModel`, so the 3D view and the Sun & Earth numbers always agree. If the backend
+later provides Sun/Earth data, it should use the same horizon or return it.
 
 Three square layers on a local east/north tangent plane centred on the site (row 0 = north edge,
 column 0 = west edge, heights in metres relative to the 1737.4 km sphere):
@@ -118,3 +152,38 @@ into `public/terrain/<siteId>/` (served at `${VITE_DATA_BASE}terrain/<siteId>/`)
 - `near.f32`, `mid.i16`, `far.i16`: ~1.6 MB per 5 m site, ~0.55 MB otherwise.
 
 Sites without a pack are built in the browser from the global grid (`horizonTerrain.js`).
+
+## `calculatePotential(params) → PotentialResult` (Playground)
+
+Params: `{ lat, lon, start, durationDays, step, panelAreaM2, tileKm }` (`step` is a Horizons step string:
+`1hour`, `2hour`, `4hour`, `12hour` or `1day`).
+
+The backend only computes power for its own sites, so coordinates within 0.01° of a backend site
+use live data and anything else uses the mock engine. Both return the backend's
+`PowerMetricsResponse` unchanged in `engine.response`. If the live call fails, the mock is used and
+`engine.reason` says why.
+
+```json
+{
+  "request": { "lat": 0.67138, "lon": 23.47398, "start": "2026-11-15T00:00:00.000Z", "end": "…",
+               "durationDays": 30, "step": "4hour", "panelAreaM2": 2, "tileKm": 40 },
+  "site": { "name": "Apollo 11", "backendId": "site-3", "lat": 0.67138, "lon": 23.47398,
+            "nearSide": true, "region": "Mid/low latitude", "altitudeM": -1922 },
+  "terrain": "TerrainPatch (see getTerrainPatch), sizeKm = tileKm, n = 128",
+  "engine": {
+    "dataSource": "live | mock",
+    "reason": null,                       // why the mock was used, else null
+    "source": "JPL Horizons via backend",
+    "efficiency": 0.2,                    // backend setting, not in the response
+    "times": [1794787200000],             // epoch ms per sample: start + i × step
+    "response": {                         // backend PowerMetricsResponse, unchanged
+      "site": { "id": "site-3", "lat": 0.67138, "lon": 23.47398 },
+      "start": "2026-11-15T00:00:00Z", "end": "2026-12-15T00:00:00Z", "step": "4hour",
+      "instantaneous_power_per_area_W_m2": [0.0],
+      "daily_power_generated_per_area_kWh_per_m2_day": [0.0],
+      "average_power_per_24h_W_m2": 85.3,
+      "average_power_sunlit_days_W_m2": 150.5
+    }
+  }
+}
+```

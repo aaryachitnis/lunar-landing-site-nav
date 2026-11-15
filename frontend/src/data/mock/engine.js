@@ -1,7 +1,9 @@
-// MOCK of Adi's processing engine (backend/app, FastAPI) for the Playground.
+// MOCK of the processing engine (backend/app, FastAPI) for Playground coordinates the backend
+// can't serve yet (it only computes power for its own catalogue sites; see fetchEnginePotential
+// in data/api.js, which uses the live backend whenever the coordinates match one of them).
 //
-// Returns exactly the shape of the engine's `PowerMetricsResponse` (backend/core/models.py), keys and
-// units included, so swapping to the real API only changes `fetchEnginePotential` in data/api.js.
+// Returns exactly the shape of the engine's `PowerMetricsResponse` (backend/core/models.py), keys
+// and units included, so live and mock results render the same way.
 //
 // Model (same as the real engine, but with mock geometry):
 //   • Sun elevation: the frontend's mock ephemeris (mock/metrics.js, also used by the God's-eye view)
@@ -12,7 +14,8 @@
 
 import { computeSiteMetrics } from './metrics.js';
 
-// Mirrors backend/app/config.py
+// Mirrors backend/app/config.py (solar_intensity_w_m2, solar_panel_efficiency, default_horizons_step).
+// The live response doesn't include these, so keep them in sync by hand.
 export const ENGINE_SETTINGS = { solarIntensityWm2: 1361, panelEfficiency: 0.2, defaultStep: '4hour' };
 
 // Horizons step strings the engine forwards to JPL Horizons, in hours.

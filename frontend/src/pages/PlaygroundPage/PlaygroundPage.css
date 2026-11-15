@@ -59,6 +59,10 @@
 }
 .pg-error { margin: 0 0 12px; }
 .tag-mock.is-live { border-style: solid; border-color: var(--good); color: var(--good); }
+.pg-reason { margin: -4px 0 10px; }
+.pg-source { margin: -6px 0 0; font-size: 12px; color: var(--text-secondary); }
+.pg-source span { color: var(--text-muted); }
+.pg-source.is-live span { color: var(--good); }
 
 /* Terrain: map + stats side by side */
 .pg-terrain { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; align-items: start; }

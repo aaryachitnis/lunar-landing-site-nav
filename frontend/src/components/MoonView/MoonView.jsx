@@ -2,13 +2,10 @@ import { useEffect, useRef } from 'react';
 import { useMoonScene } from '../../hooks/useMoonScene.js';
 import { useLetThereBeLight } from '../../hooks/useLetThereBeLight.js';
 import LightToggle from '../LightToggle/LightToggle.jsx';
-import { SITE_CATEGORIES } from '../../data/mock/sites.js';
+import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
 import './MoonView.css';
 
-/**
- * Landing Sites globe (god's-eye view) with HTML site markers.
- * @param {{ sites: object[], selectedSite: object|null, onSelect: (id) => void, insets: {left:number,right:number} }} props
- */
+/** Landing Sites globe (god's-eye view) with HTML site markers. */
 export default function MoonView({ sites, selectedSite, onSelect, insets }) {
   const containerRef = useRef(null);
   const markerEls = useRef(new Map());

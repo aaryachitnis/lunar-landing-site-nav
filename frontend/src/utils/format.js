@@ -17,7 +17,7 @@ export function toDMS(deg, pos, neg) {
 
 /** Hours → "3 d 4 h" / "5 h 12 m" / "40 m". */
 export function formatDuration(hours) {
-  if (hours == null || !Number.isFinite(hours)) return '—';
+  if (hours == null || !Number.isFinite(hours)) return 'n/a';
   const totalMin = Math.round(hours * 60);
   const d = Math.floor(totalMin / 1440);
   const h = Math.floor((totalMin % 1440) / 60);
@@ -27,7 +27,7 @@ export function formatDuration(hours) {
   return `${m} m`;
 }
 
-export const formatDeg = (v, digits = 1) => (v == null ? '—' : `${v.toFixed(digits)}°`);
-export const formatPct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
+export const formatDeg = (v, digits = 1) => (v == null ? 'n/a' : `${v.toFixed(digits)}°`);
+export const formatPct = (v) => (v == null ? 'n/a' : `${Math.round(v * 100)}%`);
 
 // Date/time formatting and validation live in utils/time.js.

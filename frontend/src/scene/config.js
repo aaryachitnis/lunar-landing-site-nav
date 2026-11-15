@@ -1,4 +1,4 @@
-// Fixed look of the globe (chosen by the team — not user-adjustable).
+// Fixed look of the globe, chosen by the team. Not user-adjustable.
 // Generated data (textures, per-site terrain packs). Served from public/ in dev; when hosting,
 // set VITE_DATA_BASE (e.g. https://cdn.example.com/lunar/) to serve the large files from a CDN.
 export const DATA_BASE = import.meta.env?.VITE_DATA_BASE ?? '/';
@@ -19,7 +19,7 @@ export const DEFAULT_VIEW = { lat: -35, lon: 0, distance: 4 }; // tilted so the 
 export const FOCUS_DISTANCE = 2.0;
 export const FLY_DURATION_MS = 1400;
 
-// "Let there be light" — optional fill that illuminates the night side (toggle in the UI).
+// "Let there be light": optional fill that illuminates the night side (toggle in the UI).
 // Off by default so the default look above (single Sun, no ambient) is unchanged.
 export const NIGHT_FILL = {
   intensity: 2.6, // directional light opposite the Sun

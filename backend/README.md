@@ -1,56 +1,71 @@
-# Backend — Lunar Landing Site Navigator
+# Backend
 
-The backend is a FastAPI service that lists lunar landing sites and calculates
-solar power estimates from JPL Horizons ephemerides. It requires Python 3.10+
-and internet access when requesting metrics from Horizons.
+A FastAPI service that lists lunar landing sites and estimates solar power at each one, using Sun positions from JPL Horizons. For the project overview, see the [root README](../README.md).
 
 ## Setup
 
-From this directory, create and activate a virtual environment, then install
-the dependencies:
+You need Python 3.10+ and internet access (each metrics request queries JPL Horizons).
 
 ```powershell
+cd backend
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-```
-
-Start the API:
-
-```powershell
 uvicorn app.main:app --reload
 ```
 
-Interactive API documentation is served at `http://127.0.0.1:8000/docs`.
-`power_gen.py` is the retained legacy implementation; the structured backend
-does not depend on running it.
+Interactive docs: http://127.0.0.1:8000/docs
+
+The frontend's dev server forwards `/api/*` here, so local development needs no CORS setup.
 
 ## Endpoints
 
-- `GET /health` — returns service status.
-- `GET /sites` — returns the ordered site IDs and coordinates.
-- `GET /sites/{site_id}/metrics?start=<ISO-8601>&end=<ISO-8601>&step=4hour`
-  — fetches Sun ephemerides and returns per-area power estimates for the time
-  range. `start` and `end` are required; `step` defaults to `4hour`.
+| Method and path | Returns |
+|---|---|
+| `GET /health` | Service status |
+| `GET /sites` | All sites as `{ id, lat, lon }`, in a stable order |
+| `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour` | Solar power for the time range |
 
-The catalog is in [`data/sites.py`](data/sites.py). Its order is stable because
-the API assigns IDs as `site-1`, `site-2`, and so on. Coordinates use
-planetocentric latitude and east-positive longitude in degrees.
+`start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. A 30-day request takes several seconds.
 
-Datetime inputs may include a `Z` suffix or an explicit UTC offset. Naive
-datetimes are interpreted as UTC. Invalid dates or reversed ranges return
-`400`, unknown site IDs return `404`, malformed Horizons data returns `502`,
-and a missing `astroquery` installation returns `503`.
+Metrics response:
 
-Power estimates use the solar constant and panel efficiency from
-[`app/config.py`](app/config.py). The shared calculations live in
-[`services/power_services.py`](services/power_services.py). Daily energy is
-integrated from samples in kWh/m²; a final partial day is integrated only over
-its observed duration.
+| Field | Meaning |
+|---|---|
+| `instantaneous_power_per_area_W_m2` | Power per m² at each step, starting at `start` |
+| `daily_power_generated_per_area_kWh_per_m2_day` | Energy per m² for each 24 h block from `start`; a final partial day covers only its own hours |
+| `average_power_per_24h_W_m2` | Mean power over the whole range |
+| `average_power_sunlit_days_W_m2` | Mean power over days with any sunlight |
+
+Power is for a flat, horizontal panel, using the solar constant and panel efficiency in [`app/config.py`](app/config.py). Terrain shadowing is not included.
+
+Errors: `400` bad dates or reversed range, `404` unknown site, `502` bad data from Horizons, `503` `astroquery` not installed.
+
+## Sites
+
+The catalog is [`data/sites.py`](data/sites.py). Ids are assigned by position (`site-1`, `site-2`, …), so add new sites at the end. Coordinates are planetocentric degrees, east-positive longitude.
+
+## Configuration
+
+| Environment variable | Use |
+|---|---|
+| `CORS_ORIGINS` | Comma-separated origins allowed to call the API from a browser, e.g. `https://example.com`. Needed only when the frontend is served from a different domain. Unset means CORS is off. |
+
+## Code layout
+
+```
+app/main.py               FastAPI app, CORS
+app/config.py             settings (solar constant, efficiency, default step, CORS)
+app/api/routes/           /health and /sites endpoints
+core/                     response models, coordinate and date helpers
+services/power_services.py   Horizons query and power calculations
+data/sites.py             site catalog
+tests/                    unit tests
+```
 
 ## Tests
 
-From the repository root, run:
+From the repository root:
 
 ```powershell
 python -m unittest discover -s backend/tests -t backend -v

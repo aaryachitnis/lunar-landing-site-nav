@@ -100,7 +100,10 @@ export default function PlaygroundPage() {
                 <h3>Landing site info</h3>
                 <dl className="kv">
                   <dt>Site</dt>
-                  <dd>{result.site.name}</dd>
+                  <dd>
+                    {result.site.name}
+                    {result.site.backendId && <span className="muted"> backend id {result.site.backendId}</span>}
+                  </dd>
                   <dt>Latitude</dt>
                   <dd className="tabular">
                     {formatLat(result.site.lat, 4)} <span className="muted">{toDMS(result.site.lat, 'N', 'S')}</span>
@@ -146,10 +149,11 @@ export default function PlaygroundPage() {
               <article className="pg-card panel-section">
                 <div className="section-head">
                   <h3>Processing engine</h3>
-                  <span className={`tag-mock${result.engine.dataSource === 'engine' ? ' is-live' : ''}`}>
-                    {result.engine.dataSource === 'engine' ? 'Live engine' : 'Mock engine'}
+                  <span className={`tag-mock${result.engine.dataSource === 'live' ? ' is-live' : ''}`}>
+                    {result.engine.dataSource === 'live' ? 'Live · JPL Horizons' : 'Mock engine'}
                   </span>
                 </div>
+                {result.engine.reason && <p className="pg-hint pg-reason">{result.engine.reason}</p>}
                 <EngineResults engine={result.engine} request={result.request} />
               </article>
             </div>

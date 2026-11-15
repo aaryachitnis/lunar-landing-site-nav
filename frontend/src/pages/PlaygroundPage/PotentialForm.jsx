@@ -1,5 +1,6 @@
 import TimePicker from '../../components/TimePicker/TimePicker.jsx';
-import { ENGINE_SETTINGS, ENGINE_STEPS } from '../../data/api.js';
+import { ENGINE_SETTINGS, ENGINE_STEPS, matchBackendSite } from '../../data/api.js';
+import { useSites } from '../../hooks/useSites.js';
 
 const TILE_SIZES = [20, 40, 80];
 
@@ -9,6 +10,15 @@ const TILE_SIZES = [20, 40, 80];
  * @param {{ values: object, errors: object, onChange: (patch: object) => void, onSubmit: () => void, busy: boolean }} props
  */
 export default function PotentialForm({ values, errors, onChange, onSubmit, busy }) {
+  // Backend sites get live power; anything else uses the mock engine.
+  const backend = useSites();
+  const match = matchBackendSite(backend.data, Number(values.lat), Number(values.lon));
+  const source = backend.error
+    ? { live: false, text: 'Backend offline: power will be mocked' }
+    : match
+      ? { live: true, text: `Live data: ${match.name}` }
+      : { live: false, text: 'Not a backend site: power will be mocked' };
+
   const field = (name, label, props = {}) => (
     <label className="pg-field">
       <span className="pg-label">{label}</span>
@@ -35,11 +45,33 @@ export default function PotentialForm({ values, errors, onChange, onSubmit, busy
     >
       <div className="pg-form-head">
         <h2>Custom site</h2>
-        <span className="tag-mock" title="Power comes from a mock of the processing engine">Mock engine</span>
       </div>
+
+      <label className="pg-field">
+        <span className="pg-label">Backend site (live data)</span>
+        <select
+          className="pg-input"
+          value={match?.id ?? ''}
+          disabled={!backend.data}
+          onChange={(e) => {
+            const s = backend.data.find((x) => x.id === e.target.value);
+            if (s) onChange({ lat: String(s.lat), lon: String(s.lon) });
+          }}
+        >
+          <option value="">{backend.loading ? 'Loading sites…' : backend.error ? 'Backend unavailable' : 'Custom coordinates'}</option>
+          {backend.data?.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {field('lon', 'Longitude (°E)', { placeholder: '-180 … 180, east positive' })}
       {field('lat', 'Latitude (°N)', { placeholder: '-90 … 90, north positive' })}
+      <p className={`pg-source ${source.live ? 'is-live' : ''}`} role="status">
+        <span aria-hidden="true">{source.live ? '●' : '○'}</span> {source.text}
+      </p>
 
       <fieldset className="pg-fieldset">
         <legend className="pg-label">Analysis window</legend>

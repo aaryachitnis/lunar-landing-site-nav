@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import router as api_router
 from app.config import get_settings
@@ -10,6 +11,14 @@ app = FastAPI(
     version=settings.app_version,
     description="Solar power estimates for lunar landing sites using JPL Horizons data.",
 )
+
+if settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.cors_origins),
+        allow_methods=["GET"],
+        allow_headers=["*"],
+    )
 
 app.include_router(api_router)
 

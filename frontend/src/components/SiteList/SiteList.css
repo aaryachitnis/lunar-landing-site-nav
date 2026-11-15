@@ -14,10 +14,6 @@
 .site-list:not(.collapsed) .site-list-toggle { position: absolute; top: 12px; right: 12px; }
 .site-list-head { display: flex; align-items: center; gap: 8px; }
 .site-list h2 { font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; margin: 0; }
-.tag-mock {
-  font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.12em; padding: 1px 6px; border-radius: 2px;
-  border: 1px dashed var(--text-muted); color: var(--text-secondary);
-}
 .site-search {
   width: 100%; padding: 6px 8px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border-strong);
   font-family: var(--mono); font-size: 12px;

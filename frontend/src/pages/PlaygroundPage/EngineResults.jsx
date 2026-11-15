@@ -134,8 +134,8 @@ export default function EngineResults({ engine, request }) {
         </details>
       </div>
       <p className="pg-hint">
-        {r.start} → {r.end} · step {r.step} · horizontal panel at {Math.round(engine.efficiency * 100)}% efficiency, no terrain
-        shadowing (engine model).
+        {engine.source} · {r.start} → {r.end} · step {r.step} · horizontal panel at {Math.round(engine.efficiency * 100)}%
+        efficiency, no terrain shadowing (engine model).
       </p>
     </div>
   );
