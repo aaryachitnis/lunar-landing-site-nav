@@ -1,1 +1,14 @@
 .superpowers/
+
+# Environment variables and secrets (anywhere in the repo). Commit *.example files instead.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets.*
+credentials.*
+
+# OS / editor clutter
+.DS_Store

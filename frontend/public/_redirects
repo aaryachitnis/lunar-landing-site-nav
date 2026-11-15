@@ -1,0 +1,5 @@
+# Netlify routing (order matters: first match wins).
+# 1. Backend: forward /api/* to the FastAPI service on Render (the app calls /api, like in dev).
+/api/*  https://lunar-landing-site-nav-ymrt.onrender.com/:splat  200
+# 2. Single-page app: every other path loads the React app.
+/*  /index.html  200
