@@ -1,12 +1,10 @@
-import re
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import Settings
 from app.dependencies import get_app_settings
 from core.models import PowerMetricsResponse, SiteSummary
 from core.utils import format_utc, get_lunar_sites_loc, parse_datetime
-from data import SITES
+from data import SITES, SiteRecord, find_site_record
 from services import (
     HorizonsRequestError,
     HorizonsUnavailableError,
@@ -16,28 +14,29 @@ from services import (
 )
 
 router = APIRouter(prefix="/sites", tags=["sites"])
-_SITE_ID_PATTERN = re.compile(r"site-(\d+)\Z")
 _DEFAULT_HORIZONS_STEP = get_app_settings().default_horizons_step
 
 
+def _site_summary(site: SiteRecord) -> SiteSummary:
+    site_id, name, location, description, agency = site
+    return SiteSummary(
+        id=site_id,
+        name=name,
+        loc=location,
+        desc=description,
+        agency=agency,
+    )
+
+
 def list_sites() -> list[SiteSummary]:
-    return [
-        SiteSummary(id=f"site-{index + 1}", lat=latitude, lon=longitude)
-        for index, (latitude, longitude) in enumerate(SITES)
-    ]
+    return [_site_summary(site) for site in SITES]
 
 
 def resolve_site(site_id: str) -> SiteSummary:
-    match = _SITE_ID_PATTERN.fullmatch(site_id)
-    if match is None:
+    site = find_site_record(site_id)
+    if site is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found.")
-
-    index = int(match.group(1)) - 1
-    if not 0 <= index < len(SITES) or site_id != f"site-{index + 1}":
-        raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found.")
-
-    latitude, longitude = SITES[index]
-    return SiteSummary(id=site_id, lat=latitude, lon=longitude)
+    return _site_summary(site)
 
 
 @router.get("", response_model=list[SiteSummary])
@@ -71,7 +70,7 @@ def get_site_metrics(
     if not step:
         raise HTTPException(status_code=400, detail="Horizons step must not be empty.")
 
-    location = get_lunar_sites_loc((site.lat, site.lon))
+    location = get_lunar_sites_loc(site.loc)
     start_horizons = start_datetime.strftime("%Y-%m-%d %H:%M")
     end_horizons = end_datetime.strftime("%Y-%m-%d %H:%M")
     try:
