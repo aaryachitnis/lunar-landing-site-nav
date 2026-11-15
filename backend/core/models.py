@@ -62,6 +62,38 @@ class CustomMetricsRequest(BaseModel):
     step: str = Field(default="4hour", min_length=1, max_length=32)
 
 
+class SkyMetricsResponse(BaseModel):
+    sun_altitude_degrees: float = Field(
+        description="Sun apparent elevation above the astronomical horizon at events_from."
+    )
+    sun_visible: bool = Field(
+        description="Whether the Sun's apparent elevation is above the astronomical horizon."
+    )
+    earth_altitude_degrees: float = Field(
+        description="Earth apparent elevation above the astronomical horizon at events_from."
+    )
+    earth_visible: bool = Field(
+        description="Whether Earth's apparent elevation is above the astronomical horizon."
+    )
+    nearest_earthrise_utc: str | None = Field(
+        default=None,
+        description="Next estimated Earthrise at or after events_from, in UTC ISO 8601.",
+    )
+    nearest_earthset_utc: str | None = Field(
+        default=None,
+        description="Next estimated Earthset at or after events_from, in UTC ISO 8601.",
+    )
+    longest_darkness_hours: float = Field(
+        ge=0.0,
+        description="Longest continuous period with the Sun below the astronomical horizon in the requested future interval.",
+    )
+    sunlit_fraction: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Fraction of the requested future interval with the Sun above the astronomical horizon.",
+    )
+
+
 class PowerMetricsResponse(BaseModel):
     site: SiteSummary
     start: str
@@ -74,6 +106,14 @@ class PowerMetricsResponse(BaseModel):
     nearest_sunset_utc: str | None = Field(
         default=None,
         description="Next estimated sunset at or after events_from (or start), in UTC ISO 8601.",
+    )
+    sky: SkyMetricsResponse | None = Field(
+        default=None,
+        description="Live Sun/Earth metrics, included when include_sky=true.",
+    )
+    sky_error: str | None = Field(
+        default=None,
+        description="Reason live sky metrics could not be calculated when include_sky=true.",
     )
     instantaneous_power_per_area_W_m2: list[float] = Field(
         description="Power per unit area for each sampled timestep."

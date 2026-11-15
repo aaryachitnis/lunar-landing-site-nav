@@ -3,10 +3,14 @@ from .power_services import (
     DEFAULT_SOLAR_INTENSITY_W_M2,
     HorizonsRequestError,
     HorizonsUnavailableError,
+    SkyMetrics,
     calculate_beta_angle,
     calculate_energy_per_day,
     calculate_instantaneous_power_per_area,
+    calculate_sky_metrics,
+    fetch_earth_ephemeris,
     fetch_solar_ephemeris,
+    find_nearest_horizon_crossings,
     find_nearest_sunrise_sunset,
 )
 
@@ -15,9 +19,13 @@ __all__ = [
     "DEFAULT_SOLAR_INTENSITY_W_M2",
     "HorizonsRequestError",
     "HorizonsUnavailableError",
+    "SkyMetrics",
     "calculate_beta_angle",
     "calculate_energy_per_day",
     "calculate_instantaneous_power_per_area",
+    "calculate_sky_metrics",
+    "fetch_earth_ephemeris",
     "fetch_solar_ephemeris",
+    "find_nearest_horizon_crossings",
     "find_nearest_sunrise_sunset",
 ]

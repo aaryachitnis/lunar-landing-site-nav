@@ -26,9 +26,9 @@ The frontend's dev server forwards `/api/*` here, so local development needs no 
 | `GET /sites` | Current JSON catalog with `id`, `name`, `loc`, `desc`, and `agency`; also includes `lat` and `lon` |
 | `POST /sites` | Add a named location to the catalog; duplicate coordinates return `409` |
 | `POST /sites/metrics` | Calculate metrics for unsaved coordinates supplied in the JSON body |
-| `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour&events_from=…` | Solar power and nearest sunrise/sunset for the time range |
+| `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour&events_from=…&include_sky=true` | Solar power, sunrise/sunset, and optional live Sun/Earth metrics |
 
-`start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. Optional `events_from` selects when the sunrise/sunset search begins; it must be within `start` and `end`, and defaults to `start`. A 30-day request takes several seconds.
+`start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. Optional `events_from` selects the time for sky-state values and the start of rise/set searches; it must be within `start` and `end`, and defaults to `start`. Set `include_sky=true` to fetch Earth's ephemeris and add the `sky` object to the response; it is off by default. A 30-day request takes several seconds.
 
 Custom metrics requests use `{ "lat": -89.0, "lon": 25.0, "start": "...", "end": "...", "step": "4hour" }`. They do not create or modify a catalog entry. To persist a site, send `POST /sites` with `{ "name": "...", "lat": -89.0, "lon": 25.0 }`. The add operation writes to `data/sites.json`; there is no delete endpoint.
 
@@ -41,9 +41,11 @@ Metrics response:
 | `average_power_per_24h_W_m2` | Mean power over the whole range |
 | `average_power_sunlit_days_W_m2` | Mean power over days with any sunlight |
 | `nearest_sunrise_utc` / `nearest_sunset_utc` | Next sunrise and sunset at or after `events_from` (or `start`), within the requested range, as UTC ISO 8601 timestamps; `null` if no crossing occurs |
+| `sky` | Present when `include_sky=true` and both ephemerides are valid; includes Sun/Earth altitude and visibility at `events_from`, next Earthrise/Earthset, longest darkness, and sunlit fraction over the remaining range |
+| `sky_error` | If optional sky metrics fail, contains the reason while preserving valid solar power and sunrise/sunset results |
 
 Power is for a flat, horizontal panel, using the solar constant and panel efficiency in [`app/config.py`](app/config.py). Terrain shadowing is not included.
-Sunrise and sunset are estimated from Sun elevation crossing 0° by linear interpolation between Horizons samples. The `step` parameter therefore affects event-time precision.
+Sunrise/sunset and Earthrise/Earthset are estimated from apparent elevation crossing 0° by linear interpolation between Horizons samples. Longest darkness and sunlit fraction use the same interpolated Sun horizon crossings. The `step` parameter therefore affects event-time precision and longest-darkness accuracy. Visibility uses the astronomical horizon; local terrain obstruction is not included.
 
 Errors: `400` bad dates or reversed range, `404` unknown site, `409` duplicate site coordinates, `422` invalid request body, `502` bad data from Horizons, `503` `astroquery` not installed.
 
