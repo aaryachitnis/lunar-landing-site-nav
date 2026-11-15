@@ -32,7 +32,7 @@ export default function TimeBar({ timeline, now, sunRuns, earthRuns, playing, on
             </button>
           ))}
           <button className="hz-btn" onClick={onLanding} title="Back to landing time">
-            ⟲ Landing
+            ⟲<span className="hz-long"> Landing</span>
           </button>
           <button className="hz-btn" onClick={onNextSun} title="Jump to just before the next sunset/sunrise">
             ⏭ ☀
@@ -42,7 +42,7 @@ export default function TimeBar({ timeline, now, sunRuns, earthRuns, playing, on
           </button>
         </div>
         <div className="hz-tb-time tabular">
-          <b>{fmtUtc(now)}</b> <span className="muted">({relLabel} from landing)</span>
+          <b>{fmtUtc(now)}</b> <span className="muted">({relLabel}<span className="hz-long"> from landing</span>)</span>
         </div>
         <div className="muted hz-tb-window">{windowLabel}</div>
       </div>

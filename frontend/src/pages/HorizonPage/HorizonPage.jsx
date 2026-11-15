@@ -2,7 +2,6 @@
 // docs/superpowers/specs/2026-11-14-horizon-view-design.md for the intended design.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { HorizonScene, deviceQuaternion } from '../../scene/HorizonScene.js';
 import { getHorizonTerrain, getSite } from '../../data/api.js';
 import { useAsync } from '../../hooks/useAsync.js';
@@ -25,6 +24,9 @@ const COMPASS = Array.from({ length: 24 }, (_, k) => {
 });
 
 const isMobile = () => window.matchMedia('(pointer: coarse)').matches;
+// Same breakpoint as the compact nav (layouts/AppLayout.css) and the compact HUD (HorizonPage.css).
+const compactMQ = window.matchMedia('(max-width: 760px), (max-height: 500px)');
+const isCompact = () => compactMQ.matches;
 
 export default function HorizonPage() {
   const { siteId: urlSite, time: urlTime, selectSite } = useSelectedSite();
@@ -135,6 +137,11 @@ export default function HorizonPage() {
     const h = hostRef.current.clientHeight;
     const hfov = (2 * Math.atan(Math.tan((f.fov * Math.PI) / 360) * (w / h)) * 180) / Math.PI;
     const pxPerDeg = w / hfov;
+    const compact = isCompact();
+    const gap = compact ? 32 : 26; // card offset from the body's centre (bodies are drawn larger on phones)
+    const topY = compact ? (h > w ? 100 : 50) : 56; // portrait: compass sits below the top chips
+    const bar = pageRef.current?.querySelector('.hz-timebar');
+    const bottomY = bar ? bar.offsetTop - 8 : h - 120;
     if (compassRef.current) {
       compassRef.current.style.setProperty('--px-per-deg', `${pxPerDeg}px`);
       compassRef.current.style.setProperty('--az', f.az);
@@ -146,9 +153,9 @@ export default function HorizonPage() {
     ]) {
       if (!card || !arrow) continue;
       if (p.inView) {
-        const right = p.x < w - 230;
-        const x = right ? p.x + 26 : p.x - 26 - card.offsetWidth;
-        const y = Math.max(56, Math.min(h - card.offsetHeight - 120, p.y - card.offsetHeight / 2));
+        const right = p.x + gap + card.offsetWidth < w - 8;
+        const x = Math.max(8, right ? p.x + gap : p.x - gap - card.offsetWidth);
+        const y = Math.max(topY, Math.min(bottomY - card.offsetHeight, p.y - card.offsetHeight / 2));
         card.style.transform = `translate(${x}px, ${y}px)`;
         card.style.opacity = 1;
         card.style.pointerEvents = 'auto';
@@ -161,8 +168,8 @@ export default function HorizonPage() {
         const ang = Math.atan2(-p.camY, p.camX);
         const cx = w / 2;
         const cy = h / 2;
-        const rx = w / 2 - 70;
-        const ry = h / 2 - 90;
+        const rx = w / 2 - (compact ? 60 : 70);
+        const ry = h / 2 - (compact ? 70 : 90);
         const t = Math.min(Math.abs(rx / Math.cos(ang)), Math.abs(ry / Math.sin(ang)));
         arrow.style.transform = `translate(${cx + Math.cos(ang) * t - 50}px, ${cy + Math.sin(ang) * t - 16}px)`;
         arrow.querySelector('.arrow-glyph').style.transform = `rotate(${ang}rad)`;
@@ -312,9 +319,6 @@ export default function HorizonPage() {
       <div className="horizon-canvas" ref={hostRef} />
 
       <div className="hz-top-left">
-        <Link className="hz-chip" to={`/?site=${encodeURIComponent(siteId)}&t=${encodeURIComponent(time)}`}>
-          ← Globe
-        </Link>
         <select className="hz-chip" value={siteId} onChange={(e) => selectSite(e.target.value)} aria-label="Landing site">
           {!sites?.some((s) => s.id === siteId) && <option value={siteId}>{site?.name ?? siteId}</option>}
           {sites?.map((s) => (
@@ -357,7 +361,7 @@ export default function HorizonPage() {
 
       <div className="hz-top-right">
         <button className={`hz-chip ${motion === 'on' ? 'active' : ''}`} onClick={toggleMotion}>
-          📱 Motion: {motion === 'waiting' ? '…' : motion}
+          📱<span className="hz-long"> Motion:</span> {motion === 'waiting' ? '…' : motion}
         </button>
         {showStats && stats && (
           <span className="hz-chip tabular" title="fps while rendering · pixel ratio · shadow-visibility compute time">
@@ -372,34 +376,46 @@ export default function HorizonPage() {
       {now && (
         <>
           <div className="hz-card" ref={sunCardRef}>
-            <h5>☀ Sun</h5>
-            <Status frac={now.sunFrac} />
-            <div className="tabular">
-              {Math.abs(now.sunAbove).toFixed(1)}° {now.sunAbove >= 0 ? 'above' : 'below'} ridge · {Math.round(now.sunFrac * 100)}% of disk
+            <div className="hz-card-head">
+              <h5>☀ Sun</h5>
+              <Status frac={now.sunFrac} />
             </div>
             <div className="tabular">
               {now.sunFrac > 0.5 ? 'Sets' : 'Rises'} in <b>{fmtHours(now.hoursToSun) ?? '> 27 d'}</b> · ~{Math.round(now.powerW)} W
             </div>
-            <div className="muted tabular">
+            <div className="tabular hz-detail">
+              {Math.abs(now.sunAbove).toFixed(1)}° {now.sunAbove >= 0 ? 'above' : 'below'} ridge · {Math.round(now.sunFrac * 100)}% of disk
+            </div>
+            <div className="muted tabular hz-detail">
               az {now.sunAz.toFixed(1)}° · el {now.sunEl.toFixed(2)}°
             </div>
-            <button className={`hz-follow ${follow === 'sun' ? 'on' : ''}`} onClick={() => setFollow('sun')}>
+            <button
+              className={`hz-follow ${follow === 'sun' ? 'on' : ''}`}
+              onClick={() => setFollow('sun')}
+              aria-pressed={follow === 'sun'}
+            >
               {follow === 'sun' ? '◉ Following' : '○ Follow'}
             </button>
           </div>
           <div className="hz-card" ref={earthCardRef}>
-            <h5>🌍 Earth</h5>
-            <Status frac={now.earthFrac} />
-            <div className="tabular">
-              {Math.abs(now.earthAbove).toFixed(1)}° {now.earthAbove >= 0 ? 'above' : 'below'} rim
+            <div className="hz-card-head">
+              <h5>🌍 Earth</h5>
+              <Status frac={now.earthFrac} />
             </div>
             <div className="tabular">
               {now.earthFrac > 0.5 ? 'Sets' : 'Rises'} in <b>{fmtHours(now.hoursToEarth) ?? '> 27 d'}</b>
             </div>
-            <div className="muted tabular">
+            <div className="tabular hz-detail">
+              {Math.abs(now.earthAbove).toFixed(1)}° {now.earthAbove >= 0 ? 'above' : 'below'} rim
+            </div>
+            <div className="muted tabular hz-detail">
               az {now.earthAz.toFixed(1)}° · el {now.earthEl.toFixed(2)}°
             </div>
-            <button className={`hz-follow ${follow === 'earth' ? 'on' : ''}`} onClick={() => setFollow('earth')}>
+            <button
+              className={`hz-follow ${follow === 'earth' ? 'on' : ''}`}
+              onClick={() => setFollow('earth')}
+              aria-pressed={follow === 'earth'}
+            >
               {follow === 'earth' ? '◉ Following' : '○ Follow'}
             </button>
           </div>
@@ -442,7 +458,16 @@ export default function HorizonPage() {
 }
 
 function Status({ frac }) {
-  if (frac >= 0.98) return <div className="ok">Visible</div>;
-  if (frac > 0.02) return <div className="warn">Partly blocked by terrain</div>;
-  return <div className="bad">Hidden behind terrain</div>;
+  if (frac >= 0.98) return <div className="hz-status ok">Visible</div>;
+  if (frac > 0.02)
+    return (
+      <div className="hz-status warn">
+        Partly blocked<span className="hz-long"> by terrain</span>
+      </div>
+    );
+  return (
+    <div className="hz-status bad">
+      Hidden<span className="hz-long"> behind terrain</span>
+    </div>
+  );
 }
