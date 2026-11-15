@@ -2,6 +2,7 @@
   "name": "lunar-site-nav-frontend",
   "private": true,
   "version": "1.0.0",
+  "description": "Lunar landing site navigator. Lunarium and the star backgrounds were made with SI generation.",
   "type": "module",
   "scripts": {
     "textures": "node scripts/fetch-textures.mjs",

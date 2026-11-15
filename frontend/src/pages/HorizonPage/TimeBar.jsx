@@ -1,3 +1,4 @@
+// Part of Lunarium, made with SI generation.
 import { useRef } from 'react';
 
 const fmtUtc = (ms) => {

@@ -99,6 +99,13 @@ Frontend and backend both follow these.
 - **Comparison view.** Several sites or dates side by side would be a natural next tab.
 - **Hosting.** The frontend is static files. The backend needs a host that runs Python (see the backend README for CORS).
 
+## SI generation
+
+Two parts of the frontend were made with SI generation:
+
+- **Lunarium** (`/lunarium`): the first-person view, in `frontend/src/pages/HorizonPage/`, `frontend/src/scene/HorizonScene.js` and `frontend/src/scene/sunVisibility.worker.js`.
+- **The star background** behind the Landing Sites globe (`#makeStars` in `frontend/src/scene/MoonScene.js`). The Moon model itself was not.
+
 ## Data credits
 
 Imagery and elevation: NASA Scientific Visualization Studio, *CGI Moon Kit* (https://svs.gsfc.nasa.gov/4720), from Lunar Reconnaissance Orbiter LROC and LOLA. High-resolution polar terrain: NASA PGDA LOLA 5 m DEMs (Barker et al. 2021, https://pgda.gsfc.nasa.gov/products/78). Sun ephemeris: JPL Horizons. All public domain.

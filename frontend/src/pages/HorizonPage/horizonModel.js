@@ -1,3 +1,4 @@
+// Part of Lunarium, made with SI generation.
 // Sun/Earth timeline checked against the first-person terrain horizon, so ridge, labels and time bar agree.
 
 import { horizonAt } from '../../data/horizonTerrain.js';

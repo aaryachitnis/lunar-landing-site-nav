@@ -34,7 +34,7 @@ Run `npm run dev:phone` and open the `https://` Network URL on a phone on the sa
 
 ### Landing Sites (`/`)
 
-- **Globe:** the Moon in NASA imagery, with a marker per site. Orbit and zoom; selecting a site flies the camera to it.
+- **Globe:** the Moon in NASA imagery, with a marker per site. Orbit and zoom; selecting a site flies the camera to it. The star background was made with SI generation; the Moon model was not.
 - **Let there be light:** lights the globe's night side. Visual only, off by default, remembered per browser.
 - **Site list** (left): sites from the backend, grouped by category, with search.
 - **Site panel** (right):
@@ -47,7 +47,7 @@ Run `npm run dev:phone` and open the `https://` Network URL on a phone on the sa
 
 ### Lunarium (`/lunarium`)
 
-A first-person view at the site, 2 m above the ground. It runs entirely on the mock Sun/Earth model and real terrain.
+A first-person view at the site, 2 m above the ground. It runs entirely on the mock Sun/Earth model and real terrain. Lunarium was made with SI generation.
 
 - Real terrain out to the horizon. Five polar sites use NASA 5 m data within 8 km; everywhere else uses the 1.9 km global grid. Craters and rocks near the viewer are generated and cosmetic.
 - Look around by dragging, or turn on **Motion** to use the phone's sensors. Pinch or scroll to zoom.

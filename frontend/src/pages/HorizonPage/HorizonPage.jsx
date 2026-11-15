@@ -1,3 +1,4 @@
+// Lunarium: first-person view at a landing site, made with SI generation.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HorizonScene, deviceQuaternion } from '../../scene/HorizonScene.js';
 import { getHorizonTerrain, getLunariumSite } from '../../data/api.js';

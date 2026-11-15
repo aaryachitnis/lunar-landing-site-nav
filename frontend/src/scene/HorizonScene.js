@@ -1,4 +1,4 @@
-// Lunarium's first-person scene. Frame: x = east, y = up, z = -north, metres, origin at the site.
+// Lunarium (made with SI generation): first-person scene. Frame: x = east, y = up, z = -north, metres, origin at the site.
 // Renders on demand; distant-ridge shadows come from a worker, recomputed only when the Sun moves.
 
 import * as THREE from 'three';
