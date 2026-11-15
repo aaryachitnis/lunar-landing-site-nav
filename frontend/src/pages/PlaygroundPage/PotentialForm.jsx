@@ -8,9 +8,16 @@ const TILE_SIZES = [20, 40, 80];
 /**
  * Left column of the sketch: coordinates, other parameters and "Calculate potential".
  * Values are kept as strings so inputs can be mid-edit; validation happens in validateForm().
- * @param {{ values: object, errors: object, onChange: (patch: object) => void, onSubmit: () => void, busy: boolean }} props
+ * @param {{ values: object, errors: object, onChange: (patch: object) => void, onSubmit: () => void, busy: boolean, canAddSite: boolean }} props
  */
-export default function PotentialForm({ values, errors, onChange, onSubmit, busy }) {
+export default function PotentialForm({
+  values,
+  errors,
+  onChange,
+  onSubmit,
+  busy,
+  canAddSite,
+}) {
   const [siteRefreshKey, setSiteRefreshKey] = useState(0);
   const [saveState, setSaveState] = useState({ busy: false, error: null, message: null });
   const backend = useSites(siteRefreshKey);
@@ -116,21 +123,6 @@ export default function PotentialForm({ values, errors, onChange, onSubmit, busy
         <span aria-hidden="true">{source.live ? '●' : '○'}</span> {source.text}
       </p>
 
-      <div className="pg-save-site">
-        {field('siteName', 'Add custom location to site list', { placeholder: 'Site name' })}
-        <button
-          className="pg-add-site"
-          type="button"
-          disabled={saveState.busy || busy || !!match}
-          onClick={saveCustomSite}
-        >
-          {saveState.busy ? 'Adding…' : match ? 'Already saved' : 'Add to site list'}
-        </button>
-        {saveState.error && <p className="field-error" role="alert">{saveState.error}</p>}
-        {saveState.message && <p className="pg-hint" role="status">{saveState.message}</p>}
-        {backend.error && <p className="pg-hint">Site list could not be loaded; saving requires the backend.</p>}
-      </div>
-
       <fieldset className="pg-fieldset">
         <legend className="pg-label">Analysis window</legend>
         <span className="pg-sublabel">Start (UTC)</span>
@@ -173,6 +165,24 @@ export default function PotentialForm({ values, errors, onChange, onSubmit, busy
       <button className="pg-submit" type="submit" disabled={busy}>
         {busy ? 'Calculating…' : 'Calculate potential'}
       </button>
+
+      <div className="pg-save-site">
+        {field('siteName', 'Add custom location to site list', { placeholder: 'Site name' })}
+        <button
+          className="pg-add-site"
+          type="button"
+          disabled={saveState.busy || busy || !canAddSite || !!match}
+          onClick={saveCustomSite}
+        >
+          {saveState.busy ? 'Adding…' : match ? 'Already saved' : 'Add to site list'}
+        </button>
+        {!canAddSite && !match && (
+          <p className="pg-hint">Calculate potential for these coordinates before saving.</p>
+        )}
+        {saveState.error && <p className="field-error" role="alert">{saveState.error}</p>}
+        {saveState.message && <p className="pg-hint" role="status">{saveState.message}</p>}
+        {backend.error && <p className="pg-hint">Site list could not be loaded; saving requires the backend.</p>}
+      </div>
     </form>
   );
 }

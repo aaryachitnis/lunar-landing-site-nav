@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { calculatePotential, ENGINE_SETTINGS, ENGINE_STEPS } from '../../data/api.js';
 import { formatLat, formatLon, toDMS } from '../../utils/format.js';
 import { sanitizeTime } from '../../utils/time.js';
+import { isCalculatedLocationCurrent } from './potentialSite.js';
 import PotentialForm, { validateForm } from './PotentialForm.jsx';
 import TerrainMap2D from './TerrainMap2D.jsx';
 import EngineResults from './EngineResults.jsx';
@@ -73,6 +74,7 @@ export default function PlaygroundPage() {
   }, []);
 
   const { result, error, busy } = state;
+  const canAddSite = isCalculatedLocationCurrent(result, values, { busy, error });
   return (
     <div className="playground-page">
       <div className="pg-layout">
@@ -83,6 +85,7 @@ export default function PlaygroundPage() {
             onChange={(patch) => setValues((v) => ({ ...v, ...patch }))}
             onSubmit={submit}
             busy={busy}
+            canAddSite={canAddSite}
           />
         </aside>
 

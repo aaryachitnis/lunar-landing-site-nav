@@ -71,7 +71,7 @@
   },
   {
     "id": "orig8",
-    "name": "Faustini Rim A",
+    "name": "Artemis 3 (Faustini Rim A)",
     "loc": [
       -87.90019,
       89.69908
@@ -81,26 +81,16 @@
   },
   {
     "id": "orig9",
-    "name": "Haworth",
+    "name": "Artemis 3 (Haworth)",
     "loc": [
       -86.77509,
       -23.13639
     ],
-    "desc": "Lunar south polar region associated with Haworth crater. Offers opportunities to investigate ancient highland terrain and potentially volatile-bearing permanently shadowed regions.",
+    "desc": "Proposed lunar south polar landing region associated with Haworth crater. Offers opportunities to investigate ancient highland terrain and potentially volatile-bearing permanently shadowed regions.",
     "agency": "NASA"
   },
   {
-    "id": "custom-c5d6bad4e3e14cbb9605c994c81f981b",
-    "name": "Test (near Artemis 3)",
-    "loc": [
-      -84.2287,
-      69.0
-    ],
-    "desc": "",
-    "agency": "Custom"
-  },
-  {
-    "id": "custom-8b579d7d130045979b3beb49e18ad013",
+    "id": "custom-e533e9e805d84c359a5f8f6cdcc03ff0",
     "name": "Lunar Null Island",
     "loc": [
       0.0,
