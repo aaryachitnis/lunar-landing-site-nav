@@ -1,5 +1,6 @@
 import GlobePage from './pages/GlobePage/GlobePage.jsx';
 import HorizonPage from './pages/HorizonPage/HorizonPage.jsx';
+import PlaygroundPage from './pages/PlaygroundPage/PlaygroundPage.jsx';
 
 // Route registry: the nav bar and <Routes> are both built from this list.
 // To add a feature: create pages/<Feature>/<Feature>.jsx and add an entry here.
@@ -7,6 +8,7 @@ import HorizonPage from './pages/HorizonPage/HorizonPage.jsx';
 export const routes = [
   { path: '/', label: 'Landing Sites', element: <GlobePage />, index: true },
   { path: '/lunarium', label: 'Lunarium', element: <HorizonPage />, immersive: true },
+  { path: '/playground', label: 'Playground', element: <PlaygroundPage /> },
 ];
 
 // Old paths that still work (query string is kept): from → to.

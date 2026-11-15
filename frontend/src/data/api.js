@@ -8,6 +8,7 @@ import { loadElevation } from './elevation.js';
 import { samplePatch } from './terrainPatch.js';
 import { assembleHorizonTerrain, fetchPack, fetchPackMeta } from './horizonTerrain.js';
 import { TERRAIN_BASE } from '../scene/config.js';
+import { ENGINE_SETTINGS, ENGINE_STEPS, mockEnginePotential } from './mock/engine.js';
 
 const latency = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 
@@ -83,3 +84,56 @@ export async function getTerrainPatch(lat, lon, opts = {}) {
   await latency(40);
   return patch;
 }
+
+// ───────────────────────────── Playground (/playground) ─────────────────────────────
+
+/**
+ * Adi's processing engine. MOCKED: returns the engine's `PowerMetricsResponse` (snake_case).
+ * To go live, replace the body with the HTTP call, e.g. once the engine accepts coordinates:
+ *   const qs = new URLSearchParams({ lat, lon, start, end, step });
+ *   const res = await fetch(`/api/potential?${qs}`);           // + a Vite proxy for /api
+ *   if (!res.ok) throw new Error((await res.json()).detail ?? `Engine HTTP ${res.status}`);
+ *   return { dataSource: 'engine', response: await res.json() };
+ * (Today the engine only has GET /sites/{site_id}/metrics?start&end&step for catalogue sites.)
+ */
+async function fetchEnginePotential({ lat, lon, start, end, step }) {
+  await latency(450);
+  return { dataSource: 'mock', response: mockEnginePotential({ lat, lon, start, end, step }) };
+}
+
+/**
+ * "Calculate potential" for any coordinate → SCHEMA.md PotentialResult. Terrain comes from the
+ * same real LOLA grid as the God's-eye view; power comes from the (mock) processing engine.
+ * @param {{lat:number, lon:number, start:string, durationDays:number, step:string, panelAreaM2:number, tileKm:number}} p
+ */
+export async function calculatePotential({ lat, lon, start, durationDays, step, panelAreaM2, tileKm }) {
+  const end = new Date(Date.parse(start) + durationDays * 86400e3).toISOString();
+  const [grid, engine] = await Promise.all([
+    loadElevation(),
+    fetchEnginePotential({ lat, lon, start, end, step }),
+  ]);
+  const terrain = samplePatch(grid, lat, lon, { sizeKm: tileKm, n: 128 });
+  const stepH = ENGINE_STEPS[step];
+  const t0 = Date.parse(engine.response.start);
+  return {
+    request: { lat, lon, start, end, durationDays, step, panelAreaM2, tileKm },
+    site: {
+      name: 'Custom site',
+      lat,
+      lon,
+      nearSide: Math.abs(lon) <= 90,
+      region: Math.abs(lat) >= 80 ? (lat < 0 ? 'South polar' : 'North polar') : Math.abs(lat) >= 60 ? 'High latitude' : 'Mid/low latitude',
+      altitudeM: terrain.centerElevationM,
+    },
+    terrain,
+    engine: {
+      ...engine,
+      efficiency: ENGINE_SETTINGS.panelEfficiency,
+      // The engine returns samples without timestamps: Horizons samples start, start+step, …, end.
+      times: engine.response.instantaneous_power_per_area_W_m2.map((_, i) => t0 + i * stepH * 3.6e6),
+    },
+  };
+}
+
+/** Engine options the Playground form offers (Horizons step strings and the engine's fixed settings). */
+export { ENGINE_STEPS, ENGINE_SETTINGS };
