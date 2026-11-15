@@ -23,7 +23,7 @@ function useIsNarrow() {
 
 /** Home route ("Landing Sites" tab): god's-eye globe of candidate landing sites. */
 export default function GlobePage() {
-  const { data: fetchedSites, loading } = useSites();
+  const { data: fetchedSites, loading, error } = useSites();
   const { siteId, time, selectSite, clearSite, setTime } = useSelectedSite();
   const [listCollapsed, setListCollapsed] = useState(false);
   const narrow = useIsNarrow();
@@ -35,7 +35,8 @@ export default function GlobePage() {
 
   const sites = useMemo(() => fetchedSites ?? [], [fetchedSites]);
 
-  const selectedSite = sites.find((s) => s.id === siteId) ?? null;
+  // Lunarium links may carry its own site ids (e.g. apollo-11); match those via terrainId.
+  const selectedSite = sites.find((s) => s.id === siteId) ?? sites.find((s) => s.terrainId === siteId) ?? null;
   const close = useCallback(() => clearSite(), [clearSite]);
 
   const insets = narrow
@@ -48,6 +49,7 @@ export default function GlobePage() {
       <SiteList
         sites={sites}
         loading={loading}
+        error={error}
         selectedId={siteId}
         onSelect={selectSite}
         collapsed={listCollapsed || (narrow && !!selectedSite)}

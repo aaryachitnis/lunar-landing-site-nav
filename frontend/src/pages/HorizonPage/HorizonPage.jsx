@@ -1,13 +1,13 @@
-// SPIKE: first-person "stand at the landing site" view. Throwaway prototype — see
-// docs/superpowers/specs/2026-11-14-horizon-view-design.md for the intended design.
+// Lunarium: first-person view standing at a landing site. Design notes:
+// docs/superpowers/specs/2026-11-14-horizon-view-design.md
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HorizonScene, deviceQuaternion } from '../../scene/HorizonScene.js';
-import { getHorizonTerrain, getSite } from '../../data/api.js';
+import { getHorizonTerrain, getLunariumSite } from '../../data/api.js';
 import { useAsync } from '../../hooks/useAsync.js';
-import { useSites } from '../../hooks/useSites.js';
+import { useLunariumSites } from '../../hooks/useSites.js';
 import { useSelectedSite } from '../../hooks/useSelectedSite.js';
-import { useSiteMetrics } from '../../hooks/useSiteMetrics.js';
+import { useSkyModel } from '../../hooks/useSkyModel.js';
 import { buildTimeline, stateAt, visibilityRuns, nextTransition, fmtHours, WINDOW } from './horizonModel.js';
 import TimeBar from './TimeBar.jsx';
 import './HorizonPage.css';
@@ -38,9 +38,9 @@ export default function HorizonPage() {
   }, []);
   const time = urlTime ?? defaultTime;
 
-  const { data: sites } = useSites();
-  const { data: site } = useAsync(() => getSite(siteId), [siteId]);
-  const metrics = useSiteMetrics(site, time);
+  const { data: sites } = useLunariumSites();
+  const { data: site } = useAsync(() => getLunariumSite(siteId), [siteId]);
+  const metrics = useSkyModel(site, time);
   const terrain = useAsync(() => (site ? getHorizonTerrain(site) : null), [site?.id]);
 
   const timeline = useMemo(

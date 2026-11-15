@@ -1,7 +1,7 @@
-import { getSiteMetrics } from '../data/api.js';
+import { getSkyModel } from '../data/api.js';
 import { useAsync } from './useAsync.js';
 
-/** Metrics for a site at a given ISO time; null site → no request. */
-export function useSiteMetrics(site, dateISO) {
-  return useAsync(() => (site ? getSiteMetrics(site, dateISO) : null), [site?.id, dateISO]);
+/** Mock Sun/Earth model for a site at an ISO time. No site means no request. */
+export function useSkyModel(site, dateISO) {
+  return useAsync(() => (site ? getSkyModel(site, dateISO) : null), [site?.id, dateISO]);
 }

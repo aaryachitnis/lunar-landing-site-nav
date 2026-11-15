@@ -24,8 +24,7 @@
   --cat-4: #c98500;
   --cat-5: #d55181;
 
-  /* chart series */
-  --series-sun: #c98500;
+    --series-sun: #c98500;
   --series-earth: #2a8cff;
   --series-power: #2a8cff;
 
@@ -65,5 +64,10 @@ a { color: var(--accent); }
   letter-spacing: 0.14em; color: var(--text-muted);
 }
 
-/* Thin dark scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* Marks data that is still mocked in the browser. */
+.tag-mock {
+  font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.12em; padding: 1px 6px; border-radius: 2px;
+  border: 1px dashed var(--text-muted); color: var(--text-secondary);
+}

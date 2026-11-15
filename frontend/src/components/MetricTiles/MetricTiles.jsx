@@ -1,7 +1,7 @@
 import { formatDeg, formatDuration } from '../../utils/format.js';
 import './MetricTiles.css';
 
-/** Yes/No with an icon so status never relies on colour alone. */
+/** Yes/No with an icon, so status never relies on colour alone. */
 function YesNo({ ok }) {
   return (
     <span className={`yes-no ${ok ? 'status-good' : 'status-critical'}`}>
@@ -10,20 +10,35 @@ function YesNo({ ok }) {
   );
 }
 
-function Tile({ label, value, sub, children }) {
+function Tile({ label, value, sub }) {
   return (
     <div className="tile">
       <div className="tile-label">{label}</div>
       <div className="tile-value tabular">{value}</div>
       {sub && <div className="tile-sub">{sub}</div>}
-      {children}
     </div>
   );
 }
 
-/** @param {{ metrics: object }} props  — see data/SCHEMA.md → SiteMetrics */
-export default function MetricTiles({ metrics }) {
-  const { now, window: w, panel } = metrics;
+const wm2 = (v) => (v == null ? '…' : `${v < 10 ? v.toFixed(1) : Math.round(v)} W/m²`);
+
+/** Live solar power from the backend. See SCHEMA.md → SitePower. */
+export function PowerTiles({ power }) {
+  const days = power.daily.length;
+  return (
+    <div className="tiles">
+      <Tile label="Power now" value={wm2(power.nowWPerM2)} sub="at selected time" />
+      <Tile label="Energy" value={`${power.totalKWhPerM2.toFixed(1)} kWh/m²`} sub={`over ${days} days`} />
+      <Tile label="Mean power" value={wm2(power.avgWPerM2)} sub="averaged over 24 h days" />
+      <Tile label="Mean, sunlit days" value={wm2(power.avgSunlitDaysWPerM2)} sub="days with any sunlight" />
+      <p className="tiles-note">Flat panel, per m². Sun position from JPL Horizons; terrain shadowing not included.</p>
+    </div>
+  );
+}
+
+/** Mock Sun and Earth model. See SCHEMA.md → SkyModel. */
+export function SkyTiles({ sky }) {
+  const { now, window: w } = sky;
   const windowNote = `next ${w.days} d`;
   const vsTerrain = (above) => `${above >= 0 ? '+' : ''}${above.toFixed(1)}° vs terrain`;
   const until = (label, hours) => (
@@ -32,18 +47,15 @@ export default function MetricTiles({ metrics }) {
   return (
     <div className="tiles">
       <Tile label="Sun altitude" value={formatDeg(now.sunElevation)} sub={`az ${formatDeg(now.sunAzimuth, 0)} · ${vsTerrain(now.sunAboveHorizon)}`} />
-      <Tile label="Sun visible" value={<YesNo ok={now.sunUp} />} sub="at selected time · terrain horizon" />
+      <Tile label="Sun visible" value={<YesNo ok={now.sunUp} />} sub="at selected time" />
       {until('Time to sunset', now.hoursToSunset)}
       {until('Time to sunrise', now.hoursToSunrise)}
       <Tile label="Earth altitude" value={formatDeg(now.earthElevation)} sub={`az ${formatDeg(now.earthAzimuth, 0)} · ${vsTerrain(now.earthAboveHorizon)}`} />
-      <Tile label="Earth visible" value={<YesNo ok={now.earthUp} />} sub="at selected time · terrain horizon" />
+      <Tile label="Earth visible" value={<YesNo ok={now.earthUp} />} sub="at selected time" />
       {until('Time to Earthset', now.hoursToEarthset)}
       {until('Time to Earthrise', now.hoursToEarthrise)}
-      <Tile label="Mean power" value={`${Math.round(w.meanPowerW)} W`} sub={`${Math.round(w.energyKWh)} kWh ${windowNote}`} />
+      <Tile label="Sunlit" value={`${Math.round(w.illuminatedFraction * 100)}%`} sub={windowNote} />
       <Tile label="Longest darkness" value={formatDuration(w.longestDarknessH)} sub={windowNote} />
-      <p className="tiles-note">
-        Power assumes {panel.areaM2} m² panel, {Math.round(panel.efficiency * 100)}% efficiency, {panel.tracking}.
-      </p>
     </div>
   );
 }
