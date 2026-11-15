@@ -129,7 +129,7 @@ Known simplifications: no true ephemeris, no Earth–Moon distance or parallax, 
 |---|---|
 | Monorepo: `frontend/` (React) + `backend/` (Python) | Team split: frontend team builds UI; another group writes Python analysis scripts. |
 | React + Vite, three.js used **imperatively** (no react-three-fiber) | UI will grow (multiple feature routes, panels). Kept the original three.js scene code as a class. |
-| The God's-eye globe is the **home route**; other features become sibling routes | Dashboard will have more features; a route registry (`frontend/src/routes.jsx`) builds both nav and routes. |
+| The god's-eye globe (**Landing Sites** tab) is the **home route**; other features become sibling routes | Dashboard will have more features; a route registry (`frontend/src/routes.jsx`) builds both nav and routes. |
 | Real NASA LRO data (LROC colour, LOLA elevation) | Real crater positions; real terrain drives elevation, slope and horizons. |
 | Globe look is **fixed**, not user-adjustable: Sun azimuth 60°, elevation 5°, intensity 3.2, exposure 1.0, relief ×0 (smooth sphere; detail from normal map, strength 1.55), ACES filmic tone mapping, **no ambient light** | Chosen by the team; values live in `frontend/src/scene/config.js`. |
 | Optional **"Let there be light"** toggle (`useLetThereBeLight` hook) adds a fill light opposite the Sun to illuminate the globe's night side; off by default | Lets users see terrain on the unlit hemisphere (e.g. far-side sites) without changing the default fixed look. Visual only; metrics are unaffected. |

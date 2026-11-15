@@ -18,7 +18,9 @@ npm run dev:phone    # HTTPS dev server on the LAN (phone motion sensors need a 
 
 ## What the user sees
 
-**Home route `/` — God's-eye view** (`src/pages/GlobePage/`)
+**Navigation:** a tab bar under the app name, built from `src/routes.jsx`: **Landing Sites** (`/`) and **Lunarium** (`/lunarium`). Switching tabs keeps `?site=` and `?t=`, so the same site and time carry across views. On phones (≤ 760 px wide or ≤ 500 px tall) the tabs collapse into a ☰ menu; on Lunarium the bar disappears entirely and only a floating ☰ button remains over the scene.
+
+**Home route `/` — Landing Sites tab** (`src/pages/GlobePage/`), a god's-eye globe
 
 - **Globe:** NASA-textured Moon on a black starfield. You can orbit and zoom; panning is off. Site markers are HTML elements projected onto the globe each frame, coloured by category and hidden when on the far side. Hover shows the name.
 - **"Let there be light" button** (bottom centre of the globe): toggles a fill light that illuminates the globe's night side, fading in and out over 0.8 s. It is off by default and the choice is remembered per browser (`localStorage`). It changes only the globe's look, not the metrics.
@@ -36,12 +38,13 @@ npm run dev:phone    # HTTPS dev server on the LAN (phone motion sensors need a 
   5. Timeline from −3 to +27 days: a solar power chart and a Sun/Earth elevation-above-terrain-horizon chart with synced hover, plus a daily table.
 - When a site is selected the camera flies to it. The globe's centre shifts so it sits in the space left free by the panels.
 
-**`/horizon` — Horizon View** (`src/pages/HorizonPage/`, opened from the site panel's "Stand here" button)
+**`/lunarium` — Lunarium tab, the first-person Horizon View** (`src/pages/HorizonPage/`, also opened from the site panel's "Stand here" button; old `/horizon` links redirect here)
 
 - First-person view standing at the site (2 m eye height): real terrain to the horizon (NASA 5 m LOLA within 8 km at Shackleton, Connecting Ridge, de Gerlache, Leibnitz Beta and Malapert; global grid elsewhere and beyond), generated craters/rocks/regolith within ~1 km (cosmetic only), black sky, Sun and Earth at true size and position, Earth phase.
 - Look around: drag/scroll on desktop; **📱 Motion** uses phone orientation sensors (relative yaw, HTTPS only). Pinch/scroll zooms.
 - Labels on Sun and Earth: visible / partly blocked / hidden, degrees above the ridge, % of disk, time to set/rise, power, and **Follow** (locks the view on the body while time runs). Edge arrows point to off-screen bodies; tap to turn to them. Compass strip on top.
 - Time bar: −12 h … +3 d around the landing time `t`, Sun and Earth visibility rows, play (1×, 1 h/s, 6 h/s), scrub, back to landing, jump to the next sunrise/sunset or Earthrise/Earthset. Scrubbing never moves the camera.
+- **Phones:** compact HUD with shorter labels, smaller Sun/Earth cards (status + time to set/rise + power), full-width Follow buttons and ≥ 40 px tap targets. The Sun is drawn 3× and Earth 2× their true size so they are findable on a small screen. This is display only: visibility, labels and power still use the true disks, so near a ridge the enlarged disk can look clipped slightly before the label changes.
 - Same terrain horizon as the site panel metrics, so numbers agree. `?stats` shows fps / pixel ratio / shadow-compute time; `?yaw=…&pitch=…` sets the initial view.
 - Rendering (`scene/HorizonScene.js`): sky, far and near terrain in three passes with separate depth ranges; renders only when something changes; Sun shadowing from distant ridges is computed in a worker (`scene/sunVisibility.worker.js`) only when the Sun moves; pixel ratio adapts to frame time.
 
