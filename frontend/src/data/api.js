@@ -3,9 +3,9 @@
 // Live (FastAPI backend):  getSites, getSitePower
 // Modeled in the browser:  getSkyModel (Sun/Earth positions), getLunariumSites
 // Terrain (NASA LOLA):     getTerrainPatch, getHorizonTerrain, getSiteHorizon
-// Playground:              calculatePotential (live for backend sites, mock otherwise)
+// Playground:              calculatePotential (live backend metrics, mock on errors)
 
-import { fetchJson } from './backend.js';
+import { fetchJson, postJson } from './backend.js';
 import { describeSite } from './siteCatalog.js';
 import { MOCK_SITES } from './mock/sites.js';
 import { computeSiteMetrics } from './mock/metrics.js';
@@ -34,9 +34,21 @@ let sitesPromise = null;
 
 /** @returns {Promise<Site[]>} Backend sites with display names attached. */
 export function getSites() {
-  sitesPromise ??= fetchJson('/sites').then((sites) => sites.map(describeSite));
-  sitesPromise.catch(() => (sitesPromise = null));
+  if (!sitesPromise) {
+    const request = fetchJson('/sites').then((sites) => sites.map(describeSite));
+    sitesPromise = request;
+    request.catch(() => {
+      if (sitesPromise === request) sitesPromise = null;
+    });
+  }
   return sitesPromise;
+}
+
+/** Add a custom location to the persistent backend catalog. */
+export async function addSite({ name, lat, lon }) {
+  const site = await postJson('/sites', { name, lat, lon });
+  sitesPromise = null;
+  return describeSite(site);
 }
 
 /** @returns {Promise<Site[]>} Lunarium's own site list (mock catalog with terrain packs). */
@@ -162,13 +174,8 @@ export async function getTerrainPatch(lat, lon, opts = {}) {
 
 // ── Playground (/playground) ───────────────────────────────────────────────
 //
-// Power for any coordinate. The backend only computes power for its own catalogue
-// (GET /sites/{id}/metrics), so:
-//   • coordinates on a backend site  → live JPL Horizons data from the backend
-//   • any other coordinates          → the mock engine (mock/engine.js), same response shape
-//   • backend unreachable / errors   → the mock, with the reason attached
-// When the backend gains a coordinate endpoint (e.g. GET /potential?lat&lon&start&end&step),
-// replace the mock branch in fetchEnginePotential with fetchJson('/potential', { lat, lon, start, end, step }).
+// Power for any coordinate uses the shared metrics calculator. Saved sites use their ID;
+// unsaved coordinates are sent to the coordinate-based backend endpoint.
 
 // Within ~0.3 km of a backend site counts as "that site" (catalogue coordinates have 4–5 decimals).
 const PLAYGROUND_MATCH_DEG = 0.01;
@@ -193,48 +200,41 @@ async function findBackendSite(lat, lon) {
  * Engine call for the Playground. Returns the backend's PowerMetricsResponse (snake_case) plus
  * where it came from: { dataSource: 'live' | 'mock', site, reason, response }.
  */
-async function fetchEnginePotential({ lat, lon, start, end, step }) {
-  const { site, error } = await findBackendSite(lat, lon);
-  if (error) {
+export async function getPotentialMetrics({ lat, lon, start, end, step }) {
+  const { site } = await findBackendSite(lat, lon);
+  const cacheSite = site?.id ?? `${lat},${lon}`;
+  try {
+    const response = await cached(
+      playgroundPowerCache,
+      `${cacheSite}|${start}|${end}|${step}`,
+      () =>
+        site
+          ? fetchJson(`/sites/${encodeURIComponent(site.id)}/metrics`, { start, end, step })
+          : postJson('/sites/metrics', { lat, lon, start, end, step }),
+    );
+    return { dataSource: 'live', site, reason: null, response };
+  } catch (error) {
     return {
       dataSource: 'mock',
-      site: null,
-      reason: `${error.message} Showing mock values.`,
+      site,
+      reason: `Live data failed (${error.message}). Showing mock values.`,
       response: mockEnginePotential({ lat, lon, start, end, step }),
     };
   }
-  if (site) {
-    try {
-      const response = await cached(playgroundPowerCache, `${site.id}|${start}|${end}|${step}`, () =>
-        fetchJson(`/sites/${encodeURIComponent(site.id)}/metrics`, { start, end, step }),
-      );
-      return { dataSource: 'live', site, reason: null, response };
-    } catch (err) {
-      return {
-        dataSource: 'mock',
-        site,
-        reason: `Live data failed (${err.message}). Showing mock values.`,
-        response: mockEnginePotential({ lat, lon, start, end, step }),
-      };
-    }
-  }
-  return {
-    dataSource: 'mock',
-    site: null,
-    reason: 'The backend only computes power for its catalogue sites, so these coordinates use the mock engine.',
-    response: mockEnginePotential({ lat, lon, start, end, step }),
-  };
 }
 
 /**
  * "Calculate potential" for any coordinate → SCHEMA.md PotentialResult. Terrain comes from the
- * same real LOLA grid as the other views; power is live when possible (see fetchEnginePotential).
+ * same real LOLA grid as the other views; power is live when possible.
  * @param {{lat:number, lon:number, start:string, durationDays:number, step:string, panelAreaM2:number, tileKm:number}} p
  * @returns {Promise<PotentialResult>}
  */
 export async function calculatePotential({ lat, lon, start, durationDays, step, panelAreaM2, tileKm }) {
   const end = new Date(Date.parse(start) + durationDays * DAY_MS).toISOString();
-  const [grid, engine] = await Promise.all([loadElevation(), fetchEnginePotential({ lat, lon, start, end, step })]);
+  const [grid, engine] = await Promise.all([
+    loadElevation(),
+    getPotentialMetrics({ lat, lon, start, end, step }),
+  ]);
   const terrain = samplePatch(grid, lat, lon, { sizeKm: tileKm, n: 128 });
   const stepH = ENGINE_STEPS[step];
   const t0 = Date.parse(engine.response.start);

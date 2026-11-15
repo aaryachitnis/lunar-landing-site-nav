@@ -1,6 +1,4 @@
-// MOCK of the processing engine (backend/app, FastAPI) for Playground coordinates the backend
-// can't serve yet (it only computes power for its own catalogue sites; see fetchEnginePotential
-// in data/api.js, which uses the live backend whenever the coordinates match one of them).
+// MOCK fallback for Playground requests when the live backend cannot compute metrics.
 //
 // Returns exactly the shape of the engine's `PowerMetricsResponse` (backend/core/models.py), keys
 // and units included, so live and mock results render the same way.

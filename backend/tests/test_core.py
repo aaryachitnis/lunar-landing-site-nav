@@ -4,7 +4,9 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from core import (
+    CustomMetricsRequest,
     PowerMetricsResponse,
+    SiteCreateRequest,
     SiteSummary,
     format_utc,
     get_lunar_sites_loc,
@@ -36,6 +38,31 @@ class CoreModelTests(unittest.TestCase):
             average_power_sunlit_days_W_m2=135.8,
         )
         self.assertEqual(metrics.site.id, "site-1")
+
+    def test_site_requests_validate_names_coordinates_and_ranges(self) -> None:
+        site = SiteCreateRequest(name="  Shackleton Ridge  ", lat=-89.0, lon=25.0)
+        self.assertEqual(site.name, "Shackleton Ridge")
+        self.assertEqual((site.lat, site.lon), (-89.0, 25.0))
+        with self.assertRaises(ValidationError):
+            SiteCreateRequest(name=" ", lat=-89.0, lon=25.0)
+        with self.assertRaises(ValidationError):
+            SiteCreateRequest(name="Invalid", lat=-91.0, lon=25.0)
+
+        request = CustomMetricsRequest(
+            lat=10.0,
+            lon=20.0,
+            start="2026-01-01T00:00:00Z",
+            end="2026-01-02T00:00:00Z",
+            step="2hour",
+        )
+        self.assertEqual((request.lat, request.lon, request.step), (10.0, 20.0, "2hour"))
+        with self.assertRaises(ValidationError):
+            CustomMetricsRequest(
+                lat=10.0,
+                lon=181.0,
+                start="2026-01-01T00:00:00Z",
+                end="2026-01-02T00:00:00Z",
+            )
 
 
 class CoreUtilityTests(unittest.TestCase):

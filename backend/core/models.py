@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from pydantic import BaseModel, Field, computed_field, model_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 Latitude = Annotated[float, Field(ge=-90.0, le=90.0)]
 Longitude = Annotated[float, Field(ge=-180.0, le=180.0)]
@@ -36,6 +36,30 @@ class SiteSummary(BaseModel):
     @property
     def lon(self) -> float:
         return self.loc[1]
+
+
+class SiteCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    lat: Latitude
+    lon: Longitude
+    desc: str = Field(default="", max_length=1000)
+    agency: str = Field(default="Custom", max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def trim_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Site name must not be empty.")
+        return value
+
+
+class CustomMetricsRequest(BaseModel):
+    lat: Latitude
+    lon: Longitude
+    start: str = Field(min_length=1)
+    end: str = Field(min_length=1)
+    step: str = Field(default="4hour", min_length=1, max_length=32)
 
 
 class PowerMetricsResponse(BaseModel):

@@ -22,6 +22,7 @@ function initialValues(params) {
   return {
     lat: params.get('lat') ?? '',
     lon: params.get('lon') ?? '',
+    siteName: '',
     start: sanitizeTime(params.get('t')) ?? nowHour(),
     durationDays: params.get('days') ?? '30',
     step: ENGINE_STEPS[params.get('step')] ? params.get('step') : ENGINE_SETTINGS.defaultStep,
@@ -32,7 +33,8 @@ function initialValues(params) {
 
 /**
  * Playground: enter any lunar coordinate, "Calculate potential", and see site info, a 2D terrain
- * map (real LOLA, same source as the God's-eye view) and the processing engine's results (mocked).
+ * map (real LOLA, same source as the God's-eye view) and live processing-engine results when
+ * available, with an explicit mock fallback if the backend request fails.
  */
 export default function PlaygroundPage() {
   const [params, setParams] = useSearchParams();

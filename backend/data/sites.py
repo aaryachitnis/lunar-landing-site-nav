@@ -1,33 +1,159 @@
-"""Curated lunar landing sites and their metadata.
+"""Persistent lunar landing-site catalog backed by a JSON array."""
 
-Coordinates are planetocentric degrees in (latitude, longitude) order.
-"""
-
+import json
+import math
+import os
 import re
-from typing import Final
+from pathlib import Path
+from threading import RLock
+from uuid import uuid4
 
 SiteCoordinates = tuple[float, float]
 SiteRecord = tuple[str, str, SiteCoordinates, str, str]
+SITE_CATALOG_PATH = Path(__file__).with_name("sites.json")
 _LEGACY_SITE_ID_PATTERN = re.compile(r"site-([1-9]\d*)\Z")
+_CATALOG_LOCK = RLock()
 
-# Each record is (id, name, (latitude, longitude), description, agency).
 
-SITES: Final[tuple[SiteRecord, ...]] = (
-    ("orig1", "Artemis 3 (Amundsen)", (-84.2287, 69.44396), "Proposed lunar south polar landing region near Amundsen crater. Offers access to ancient highland terrain and nearby permanently shadowed regions of scientific interest.", "NASA"),
-    ("orig2", "Apollo 17 (Taurus-Littrow)", (20.19032, 30.77314), "Final Apollo lunar landing site, situated in the Taurus-Littrow valley between mountainous highlands and volcanic mare terrain. Selected to investigate highland materials and volcanic deposits.", "NASA"),
-    ("orig3", "Apollo 11 (Mare Tranquillitatis)", (0.67138, 23.47398), "Historic first crewed lunar landing site, located within Mare Tranquillitatis. A relatively smooth mare basalt plain selected to demonstrate the feasibility of a crewed lunar landing.", "NASA"),
-    ("orig4", "Apollo 14 (Fra Mauro)", (-3.6452, -17.4715), "Located in the Fra Mauro highlands, containing material associated with the Imbrium impact basin. Selected to investigate lunar crustal materials and impact ejecta.", "NASA"),
-    ("orig5", "Apollo 15 (Hadley-Apennine)", (26.13214, 3.6338), "Located near Hadley Rille and the Apennine Mountains, providing access to mountainous highland terrain, volcanic plains and a prominent lunar geological rille.", "NASA"),
-    ("orig6", "Apollo 12 (Oceanus Procellarum)", (-3.01234, -23.42159), "Located in Oceanus Procellarum (Ocean of Storms), a large lunar mare region. Selected to investigate mare basalt deposits and demonstrate precision landing capabilities.", "NASA"),
-    ("orig7", "Apollo 16 (Descartes Highlands)", (-8.99123, 15.51441), "Located in the Descartes Highlands, an elevated lunar region investigated for ancient crustal materials and geological history, including highland rocks and impact-related deposits.", "NASA"),
-    ("orig8", "Faustini Rim A", (-87.90019, 89.69908), "Proposed lunar south polar landing region near the rim of Faustini crater. Offers access to polar highland terrain and proximity to permanently shadowed regions that may contain water ice.", "NASA"),
-    ("orig9", "Haworth", (-86.77509, -23.13639), "Lunar south polar region associated with Haworth crater. Offers opportunities to investigate ancient highland terrain and potentially volatile-bearing permanently shadowed regions.", "NASA"),
-)
+class SiteCatalogError(RuntimeError):
+    """Raised when the persisted site catalog cannot be read or written."""
+
+
+class DuplicateSiteError(ValueError):
+    """Raised when a site with the same coordinates is already in the catalog."""
+
+
+def _record_from_json(value: object, index: int) -> SiteRecord:
+    if not isinstance(value, dict):
+        raise SiteCatalogError(f"Site catalog entry {index} must be an object.")
+
+    site_id = value.get("id")
+    name = value.get("name")
+    location = value.get("loc")
+    description = value.get("desc", "")
+    agency = value.get("agency", "")
+    if not isinstance(site_id, str) or not site_id.strip():
+        raise SiteCatalogError(f"Site catalog entry {index} has an invalid id.")
+    if not isinstance(name, str) or not name.strip():
+        raise SiteCatalogError(f"Site catalog entry {index} has an invalid name.")
+    if (
+        not isinstance(location, (list, tuple))
+        or len(location) != 2
+        or any(isinstance(value, bool) for value in location)
+    ):
+        raise SiteCatalogError(f"Site catalog entry {index} must have [latitude, longitude].")
+    if not isinstance(description, str) or not isinstance(agency, str):
+        raise SiteCatalogError(f"Site catalog entry {index} has invalid metadata.")
+
+    try:
+        latitude, longitude = float(location[0]), float(location[1])
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise SiteCatalogError(
+            f"Site catalog entry {index} coordinates must be numeric."
+        ) from exc
+    if (
+        not math.isfinite(latitude)
+        or not -90.0 <= latitude <= 90.0
+        or not math.isfinite(longitude)
+        or not -180.0 <= longitude <= 180.0
+    ):
+        raise SiteCatalogError(f"Site catalog entry {index} coordinates are out of range.")
+
+    return (
+        site_id.strip(),
+        name.strip(),
+        (latitude, longitude),
+        description,
+        agency,
+    )
+
+
+def load_site_records() -> tuple[SiteRecord, ...]:
+    """Read and validate the catalog from disk."""
+    with _CATALOG_LOCK:
+        try:
+            data = json.loads(SITE_CATALOG_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SiteCatalogError(
+                f"Unable to read site catalog at {SITE_CATALOG_PATH}."
+            ) from exc
+
+    if not isinstance(data, list):
+        raise SiteCatalogError("Site catalog must be a JSON array.")
+
+    records = tuple(_record_from_json(value, index) for index, value in enumerate(data))
+    ids = [record[0] for record in records]
+    locations = [record[2] for record in records]
+    if len(set(ids)) != len(ids):
+        raise SiteCatalogError("Site catalog IDs must be unique.")
+    if len(set(locations)) != len(locations):
+        raise SiteCatalogError("Site catalog coordinates must be unique.")
+    return records
+
+
+def _write_site_records(records: tuple[SiteRecord, ...]) -> None:
+    serialized = [
+        {
+            "id": site_id,
+            "name": name,
+            "loc": list(location),
+            "desc": description,
+            "agency": agency,
+        }
+        for site_id, name, location, description, agency in records
+    ]
+    temporary_path = SITE_CATALOG_PATH.with_name(
+        f"{SITE_CATALOG_PATH.name}.{uuid4().hex}.tmp"
+    )
+    try:
+        temporary_path.write_text(
+            f"{json.dumps(serialized, indent=2, ensure_ascii=False)}\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, SITE_CATALOG_PATH)
+    except OSError as exc:
+        raise SiteCatalogError(
+            f"Unable to write site catalog at {SITE_CATALOG_PATH}."
+        ) from exc
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def add_site_record(
+    name: str,
+    location: SiteCoordinates,
+    description: str = "",
+    agency: str = "Custom",
+) -> SiteRecord:
+    """Append one validated site and atomically persist the JSON catalog."""
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Site name must not be empty.")
+    if not isinstance(description, str) or not isinstance(agency, str):
+        raise ValueError("Site description and agency must be strings.")
+
+    candidate = _record_from_json(
+        {
+            "id": f"custom-{uuid4().hex}",
+            "name": name,
+            "loc": location,
+            "desc": description,
+            "agency": agency,
+        },
+        0,
+    )
+    with _CATALOG_LOCK:
+        records = load_site_records()
+        if candidate[2] in {record[2] for record in records}:
+            raise DuplicateSiteError("A site with these coordinates already exists.")
+        updated_records = records + (candidate,)
+        _write_site_records(updated_records)
+    return candidate
 
 
 def find_site_record(site_id: str) -> SiteRecord | None:
     """Find a site by canonical ID or its previous position-based ID."""
-    for site in SITES:
+    sites = load_site_records()
+    for site in sites:
         if site[0] == site_id:
             return site
 
@@ -36,4 +162,7 @@ def find_site_record(site_id: str) -> SiteRecord | None:
         return None
 
     index = int(match.group(1)) - 1
-    return SITES[index] if index < len(SITES) else None
+    return sites[index] if index < len(sites) else None
+
+
+SITES = load_site_records()
