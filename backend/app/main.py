@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api import router as api_router
 from app.config import get_settings
 
 settings = get_settings()
@@ -10,6 +11,8 @@ app = FastAPI(
     description="Solar power estimates for lunar landing sites using JPL Horizons data.",
 )
 
+app.include_router(api_router)
+
 
 @app.get("/", tags=["status"])
 def root():
@@ -18,8 +21,3 @@ def root():
         "status": "ok",
         "docs": "/docs",
     }
-
-
-@app.get("/health", tags=["status"])
-def health_check():
-    return {"status": "ok"}
