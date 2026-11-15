@@ -1,5 +1,6 @@
-// Display names for the backend's sites. The backend returns only ids and coordinates,
-// so each site is matched to a known landing site by position.
+// Turns the backend's sites into what the UI shows. The backend provides the name, agency and
+// description; this adds a category, splits the name into mission and region, and links the
+// site to Lunarium's terrain pack for the same place.
 
 import { MOCK_SITES } from './mock/sites.js';
 
@@ -12,33 +13,40 @@ export const SITE_CATEGORIES = {
   other: { label: 'Other sites', color: 'var(--text-muted)' },
 };
 
-const EXTRA_KNOWN_SITES = [
-  { id: 'apollo-12', name: 'Apollo 12', lat: -3.012, lon: -23.422, category: 'apollo', agency: 'NASA', notes: 'Oceanus Procellarum (1969).' },
-  { id: 'apollo-14', name: 'Apollo 14', lat: -3.645, lon: -17.471, category: 'apollo', agency: 'NASA', notes: 'Fra Mauro (1971).' },
-  { id: 'apollo-16', name: 'Apollo 16', lat: -8.973, lon: 15.5, category: 'apollo', agency: 'NASA', notes: 'Descartes Highlands (1972).' },
-];
+const TERRAIN_MATCH_DEG = 0.05;
 
-const KNOWN_SITES = [...MOCK_SITES, ...EXTRA_KNOWN_SITES];
-const MATCH_TOLERANCE_DEG = 0.05;
+function categoryOf(name, lat) {
+  if (/^apollo\b/i.test(name)) return 'apollo';
+  if (/^artemis\b/i.test(name)) return 'artemis-candidate';
+  if (lat < -80) return 'south-pole';
+  return 'other';
+}
 
-const fmtCoord = (v, pos, neg) => `${Math.abs(v).toFixed(2)}°${v >= 0 ? pos : neg}`;
+/** "Apollo 17 (Taurus-Littrow)" → { mission: "Apollo 17", region: "Taurus-Littrow" }. */
+function splitName(fullName) {
+  const m = /^(.*?)\s*\((.+)\)\s*$/.exec(fullName);
+  return m ? { mission: m[1], region: m[2] } : { mission: fullName, region: null };
+}
 
-/** Adds name, category, agency and notes to a backend site ({ id, lat, lon }). */
-export function describeSite(site) {
-  const known = KNOWN_SITES.find(
-    (k) => Math.abs(k.lat - site.lat) < MATCH_TOLERANCE_DEG && Math.abs(k.lon - site.lon) < MATCH_TOLERANCE_DEG,
+/** Backend site ({ id, name, desc, agency, lat, lon }) → the Site shape in SCHEMA.md. */
+export function describeSite(site, index) {
+  const fullName = site.name || site.id;
+  const { mission, region } = splitName(fullName);
+  const terrain = MOCK_SITES.find(
+    (k) => Math.abs(k.lat - site.lat) < TERRAIN_MATCH_DEG && Math.abs(k.lon - site.lon) < TERRAIN_MATCH_DEG,
   );
-  if (known) {
-    const { name, category, agency, notes } = known;
-    // terrainId points Lunarium at the prebuilt terrain pack for this place, if there is one.
-    return { ...site, name, category, agency, notes, terrainId: known.id };
-  }
-  const number = site.id.replace(/^site-/, '');
   return {
-    ...site,
-    name: `Site ${number}`,
-    category: site.lat < -80 ? 'south-pole' : 'other',
-    agency: 'Backend catalog',
-    notes: `${fmtCoord(site.lat, 'N', 'S')}, ${fmtCoord(site.lon, 'E', 'W')}`,
+    id: site.id,
+    lat: site.lat,
+    lon: site.lon,
+    name: mission,
+    region,
+    fullName,
+    agency: site.agency,
+    description: site.desc,
+    category: categoryOf(fullName, site.lat),
+    terrainId: terrain?.id,
+    // Ids the backend used before it named its sites; old shared links still use them.
+    legacyId: `site-${index + 1}`,
   };
 }
