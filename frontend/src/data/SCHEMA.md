@@ -6,10 +6,11 @@ is below.
 | Function | Source |
 |---|---|
 | `getSites()` | **Live:** backend `GET /sites`, plus display names |
-| `getSitePower(site, dateISO)` | **Live:** backend `GET /sites/{id}/metrics` (JPL Horizons) |
-| `getSkyModel(site, dateISO)` | **Mock:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
+| `getSitePower(site, dateISO)` | **Live:** backend `GET /sites/{id}/metrics` (JPL Horizons), including nearest sunrise/sunset from `dateISO` |
+| `getSkyModel(site, dateISO)` | **Modeled:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
 | `getLunariumSites()` | **Mock:** Lunarium's site list in [`mock/sites.js`](mock/sites.js) |
 | `getTerrainPatch`, `getHorizonTerrain`, `getSiteHorizon` | NASA LOLA elevation data, processed in the browser |
+| `calculatePotential(params)` | Playground. **Live** backend `GET /sites/{id}/metrics` when the coordinates match a backend site, else **mock** ([`mock/engine.js`](mock/engine.js)); terrain from LOLA |
 
 Conventions: angles in degrees; latitude -90 to 90 (south negative); longitude -180 to 180 (east
 positive); times ISO 8601 UTC; azimuth clockwise from local north. Elevation is above the
@@ -17,25 +18,30 @@ astronomical horizon unless the field says `AboveHorizon` (relative to the local
 
 ## `getSites() → Site[]`
 
-The backend returns `{ id, lat, lon }`. [`siteCatalog.js`](siteCatalog.js) adds display fields by
-matching coordinates against known landing sites (within 0.05°). Unmatched sites are named
-"Site N".
+The backend returns `{ id, name, desc, agency, loc, lat, lon }`. [`siteCatalog.js`](siteCatalog.js)
+reshapes each site for the UI:
 
 ```json
 {
-  "id": "site-3",
-  "lat": 0.67138,
-  "lon": 23.47398,
-  "name": "Apollo 11",
-  "category": "artemis-candidate | clps | international | apollo | south-pole | other",
+  "id": "orig2",
+  "lat": 20.19032,
+  "lon": 30.77314,
+  "name": "Apollo 17",
+  "region": "Taurus-Littrow",
+  "fullName": "Apollo 17 (Taurus-Littrow)",
   "agency": "NASA",
-  "notes": "Mare Tranquillitatis (1969).",
-  "terrainId": "apollo-11"
+  "description": "Final Apollo lunar landing site, situated in the Taurus-Littrow valley …",
+  "category": "artemis-candidate | apollo | south-pole | other",
+  "terrainId": "apollo-17",
+  "legacyId": "site-2"
 }
 ```
 
-`terrainId` is set for matched sites. It names the prebuilt terrain pack, and lets a Lunarium
-link (`?site=apollo-11`) select the same site on the Landing Sites tab.
+- `name` and `region` are split from the backend name "Mission (Region)". Names without brackets have no region.
+- `category` comes from the name (Apollo, Artemis) or latitude (below 80°S is south pole).
+- `terrainId` is set when a Lunarium terrain pack exists within 0.05° of the site. It also lets a
+  Lunarium link (`?site=apollo-17`) select the same site on the Landing Sites tab.
+- `legacyId` is the backend's old position-based id, so links shared before sites were named still work.
 
 ## `getSitePower(site, dateISO) → SitePower`
 
@@ -55,11 +61,17 @@ returns values only, so sample times are rebuilt from `start` and the step.
   "totalKWhPerM2": 61.6,
   "avgWPerM2": 86,
   "avgSunlitDaysWPerM2": 160,
+  "nearestSunriseUtc": "2026-11-15T18:24:00Z",
+  "nearestSunsetUtc": "2026-11-16T04:12:00Z",
   "source": "JPL Horizons via backend"
 }
 ```
 
-## `getSkyModel(site, dateISO) → SkyModel` (mock)
+The request includes `events_from=dateISO`, so the event times are the next crossings at or after
+the selected time, even though the power-series window begins three days earlier. Both fields are
+`null` when no event occurs before the end of the 27-day window.
+
+## `getSkyModel(site, dateISO) → SkyModel` (modeled)
 
 ```json
 {
@@ -91,6 +103,8 @@ returns values only, so sample times are rebuilt from `start` and the step.
 - `hoursTo…` fields are `null` when the event is not within the window.
 - `series` is hourly, from 3 days before to 27 days after the selected time.
 - `powerW` is used only by Lunarium. The Landing Sites panel shows live power from `getSitePower`.
+- In the Landing Sites panel, the time-to-sunrise/sunset tiles use `getSitePower`'s live event
+  timestamps; Sun/Earth positions, visibility, Earth events, and illumination remain modeled locally.
 
 ## `getTerrainPatch(lat, lon, { sizeKm, n }) → TerrainPatch`
 
@@ -151,3 +165,38 @@ into `public/terrain/<siteId>/` (served at `${VITE_DATA_BASE}terrain/<siteId>/`)
 - `near.f32`, `mid.i16`, `far.i16`: ~1.6 MB per 5 m site, ~0.55 MB otherwise.
 
 Sites without a pack are built in the browser from the global grid (`horizonTerrain.js`).
+
+## `calculatePotential(params) → PotentialResult` (Playground)
+
+Params: `{ lat, lon, start, durationDays, step, panelAreaM2, tileKm }` (`step` is a Horizons step string:
+`1hour`, `2hour`, `4hour`, `12hour` or `1day`).
+
+The backend only computes power for its own sites, so coordinates within 0.01° of a backend site
+use live data and anything else uses the mock engine. Both return the backend's
+`PowerMetricsResponse` unchanged in `engine.response`. If the live call fails, the mock is used and
+`engine.reason` says why.
+
+```json
+{
+  "request": { "lat": 0.67138, "lon": 23.47398, "start": "2026-11-15T00:00:00.000Z", "end": "…",
+               "durationDays": 30, "step": "4hour", "panelAreaM2": 2, "tileKm": 40 },
+  "site": { "name": "Apollo 11", "backendId": "site-3", "lat": 0.67138, "lon": 23.47398,
+            "nearSide": true, "region": "Mid/low latitude", "altitudeM": -1922 },
+  "terrain": "TerrainPatch (see getTerrainPatch), sizeKm = tileKm, n = 128",
+  "engine": {
+    "dataSource": "live | mock",
+    "reason": null,                       // why the mock was used, else null
+    "source": "JPL Horizons via backend",
+    "efficiency": 0.2,                    // backend setting, not in the response
+    "times": [1794787200000],             // epoch ms per sample: start + i × step
+    "response": {                         // backend PowerMetricsResponse, unchanged
+      "site": { "id": "site-3", "lat": 0.67138, "lon": 23.47398 },
+      "start": "2026-11-15T00:00:00Z", "end": "2026-12-15T00:00:00Z", "step": "4hour",
+      "instantaneous_power_per_area_W_m2": [0.0],
+      "daily_power_generated_per_area_kWh_per_m2_day": [0.0],
+      "average_power_per_24h_W_m2": 85.3,
+      "average_power_sunlit_days_W_m2": 150.5
+    }
+  }
+}
+```

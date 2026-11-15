@@ -1,4 +1,4 @@
-import re
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -6,38 +6,40 @@ from app.config import Settings
 from app.dependencies import get_app_settings
 from core.models import PowerMetricsResponse, SiteSummary
 from core.utils import format_utc, get_lunar_sites_loc, parse_datetime
-from data import SITES
+from data import SITES, SiteRecord, find_site_record
 from services import (
     HorizonsRequestError,
     HorizonsUnavailableError,
     calculate_energy_per_day,
     calculate_instantaneous_power_per_area,
     fetch_solar_ephemeris,
+    find_nearest_sunrise_sunset,
 )
 
 router = APIRouter(prefix="/sites", tags=["sites"])
-_SITE_ID_PATTERN = re.compile(r"site-(\d+)\Z")
 _DEFAULT_HORIZONS_STEP = get_app_settings().default_horizons_step
 
 
+def _site_summary(site: SiteRecord) -> SiteSummary:
+    site_id, name, location, description, agency = site
+    return SiteSummary(
+        id=site_id,
+        name=name,
+        loc=location,
+        desc=description,
+        agency=agency,
+    )
+
+
 def list_sites() -> list[SiteSummary]:
-    return [
-        SiteSummary(id=f"site-{index + 1}", lat=latitude, lon=longitude)
-        for index, (latitude, longitude) in enumerate(SITES)
-    ]
+    return [_site_summary(site) for site in SITES]
 
 
 def resolve_site(site_id: str) -> SiteSummary:
-    match = _SITE_ID_PATTERN.fullmatch(site_id)
-    if match is None:
+    site = find_site_record(site_id)
+    if site is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found.")
-
-    index = int(match.group(1)) - 1
-    if not 0 <= index < len(SITES) or site_id != f"site-{index + 1}":
-        raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found.")
-
-    latitude, longitude = SITES[index]
-    return SiteSummary(id=site_id, lat=latitude, lon=longitude)
+    return _site_summary(site)
 
 
 @router.get("", response_model=list[SiteSummary])
@@ -57,21 +59,33 @@ def get_site_metrics(
         description="Time step for the Horizons query (for example 4hour).",
     ),
     settings: Settings = Depends(get_app_settings),
+    events_from: Annotated[
+        str | None,
+        Query(description="Start time for sunrise/sunset search; defaults to start."),
+    ] = None,
 ) -> PowerMetricsResponse:
     site = resolve_site(site_id)
     try:
         start_datetime = parse_datetime(start)
         end_datetime = parse_datetime(end)
+        events_start_datetime = (
+            parse_datetime(events_from) if events_from is not None else start_datetime
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if end_datetime <= start_datetime:
         raise HTTPException(status_code=400, detail="End time must be later than start time.")
+    if not start_datetime <= events_start_datetime <= end_datetime:
+        raise HTTPException(
+            status_code=400,
+            detail="Sunrise/sunset search start must be within the requested range.",
+        )
     step = step.strip()
     if not step:
         raise HTTPException(status_code=400, detail="Horizons step must not be empty.")
 
-    location = get_lunar_sites_loc((site.lat, site.lon))
+    location = get_lunar_sites_loc(site.loc)
     start_horizons = start_datetime.strftime("%Y-%m-%d %H:%M")
     end_horizons = end_datetime.strftime("%Y-%m-%d %H:%M")
     try:
@@ -93,6 +107,11 @@ def get_site_metrics(
             panel_efficiency=settings.solar_panel_efficiency,
         )
         daily_energy = calculate_energy_per_day(instantaneous_power, ephemeris)
+        sunrise, sunset = find_nearest_sunrise_sunset(
+            ephemeris,
+            events_start_datetime,
+            end_datetime,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=502,
@@ -115,6 +134,8 @@ def get_site_metrics(
         start=format_utc(start_datetime),
         end=format_utc(end_datetime),
         step=step,
+        nearest_sunrise_utc=format_utc(sunrise) if sunrise is not None else None,
+        nearest_sunset_utc=format_utc(sunset) if sunset is not None else None,
         instantaneous_power_per_area_W_m2=[
             float(value) for value in instantaneous_power
         ],

@@ -23,10 +23,10 @@ The frontend's dev server forwards `/api/*` here, so local development needs no 
 | Method and path | Returns |
 |---|---|
 | `GET /health` | Service status |
-| `GET /sites` | All sites as `{ id, lat, lon }`, in a stable order |
-| `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour` | Solar power for the time range |
+| `GET /sites` | All sites with `id`, `name`, `loc`, `desc`, and `agency`; also includes `lat` and `lon` for compatibility |
+| `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour&events_from=…` | Solar power and nearest sunrise/sunset for the time range |
 
-`start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. A 30-day request takes several seconds.
+`start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. Optional `events_from` selects when the sunrise/sunset search begins; it must be within `start` and `end`, and defaults to `start`. A 30-day request takes several seconds.
 
 Metrics response:
 
@@ -36,14 +36,16 @@ Metrics response:
 | `daily_power_generated_per_area_kWh_per_m2_day` | Energy per m² for each 24 h block from `start`; a final partial day covers only its own hours |
 | `average_power_per_24h_W_m2` | Mean power over the whole range |
 | `average_power_sunlit_days_W_m2` | Mean power over days with any sunlight |
+| `nearest_sunrise_utc` / `nearest_sunset_utc` | Next sunrise and sunset at or after `events_from` (or `start`), within the requested range, as UTC ISO 8601 timestamps; `null` if no crossing occurs |
 
 Power is for a flat, horizontal panel, using the solar constant and panel efficiency in [`app/config.py`](app/config.py). Terrain shadowing is not included.
+Sunrise and sunset are estimated from Sun elevation crossing 0° by linear interpolation between Horizons samples. The `step` parameter therefore affects event-time precision.
 
 Errors: `400` bad dates or reversed range, `404` unknown site, `502` bad data from Horizons, `503` `astroquery` not installed.
 
 ## Sites
 
-The catalog is [`data/sites.py`](data/sites.py). Ids are assigned by position (`site-1`, `site-2`, …), so add new sites at the end. Coordinates are planetocentric degrees, east-positive longitude.
+The catalog is [`data/sites.py`](data/sites.py). Canonical IDs are stored with each site (for example, `orig1`); the previous position-based IDs (`site-1`, `site-2`, …) remain accepted for metrics requests. `loc` is `[latitude, longitude]` in planetocentric degrees, with east-positive longitude. Metrics responses include the same site metadata.
 
 ## Configuration
 

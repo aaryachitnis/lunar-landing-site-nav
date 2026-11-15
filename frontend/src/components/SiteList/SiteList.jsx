@@ -9,7 +9,7 @@ export default function SiteList({ sites, selectedId, onSelect, loading, error, 
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = sites.filter((s) => !q || `${s.name} ${s.agency}`.toLowerCase().includes(q));
+    const filtered = sites.filter((s) => !q || `${s.fullName} ${s.agency} ${s.description}`.toLowerCase().includes(q));
     return Object.entries(SITE_CATEGORIES)
       .map(([key, cat]) => ({ key, ...cat, sites: filtered.filter((s) => s.category === key) }))
       .filter((g) => g.sites.length);
@@ -46,7 +46,10 @@ export default function SiteList({ sites, selectedId, onSelect, loading, error, 
                   {g.sites.map((s) => (
                     <li key={s.id}>
                       <button className={`site-row${s.id === selectedId ? ' active' : ''}`} onClick={() => onSelect(s.id)}>
-                        <span className="site-row-name">{s.name}</span>
+                        <span className="site-row-name">
+                          {s.name}
+                          {s.region && <span className="site-row-region">{s.region}</span>}
+                        </span>
                         <span className="site-row-coords tabular">
                           {formatLat(s.lat, 1)} {formatLon(s.lon, 1)}
                         </span>

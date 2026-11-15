@@ -12,6 +12,7 @@
     "dev:phone": "vite --mode phone",
     "prebuild": "node scripts/fetch-textures.mjs --if-missing && node scripts/fetch-site-terrain.mjs --if-missing",
     "build": "vite build",
+    "test": "node --test",
     "preview": "vite preview"
   },
   "dependencies": {

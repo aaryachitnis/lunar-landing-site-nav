@@ -24,6 +24,17 @@
 }
 .icon-btn:hover { color: var(--accent); border-color: var(--accent); }
 
+.panel-actions { display: flex; gap: 6px; align-items: flex-start; flex: none; }
+.info-tip { position: relative; }
+.info-tip .icon-btn { font-family: var(--mono); font-weight: 700; font-style: italic; }
+.info-tip-body {
+  display: none; position: absolute; top: calc(100% + 6px); right: 0; z-index: 10; width: min(300px, 80vw);
+  padding: 10px 12px; font-size: 13px; line-height: 1.45; color: var(--text-primary);
+  background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius);
+  box-shadow: 0 8px 24px #000a, var(--glow);
+}
+.info-tip:hover .info-tip-body, .info-tip:focus-within .info-tip-body, .info-tip.open .info-tip-body { display: block; }
+
 /* Section headings: "LOCATION ────────" (same font as the "Landing sites" title) */
 .panel-section h3 {
   display: flex; align-items: center; gap: 8px; margin: 0 0 10px;

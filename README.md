@@ -61,7 +61,7 @@ The app has two tabs:
 
 | Data | Source | Status |
 |---|---|---|
-| Site list | Backend `GET /sites` | **Live** |
+| Site list: names, agencies, descriptions | Backend `GET /sites` | **Live** |
 | Solar power (W/m², daily kWh/m²) | Backend `GET /sites/{id}/metrics`, using JPL Horizons | **Live** |
 | Sun and Earth positions, rise/set times, visibility | Geometric model in `frontend/src/data/mock/metrics.js` | **Mock**, tagged in the UI |
 | Lunarium's site list | `frontend/src/data/mock/sites.js` | **Mock** |
@@ -96,7 +96,6 @@ Frontend and backend both follow these.
 
 - **Sun and Earth from the backend.** JPL Horizons already supplies the Sun; adding Earth (and the terrain horizon) would retire the mock model.
 - **Terrain shadowing in power.** The backend's power assumes a flat panel with no terrain in the way. At the poles, terrain often blocks the Sun.
-- **Site names.** The backend returns ids and coordinates only. The frontend matches them to known landing sites by position (`frontend/src/data/siteCatalog.js`). Names could move into the backend.
 - **Comparison view.** Several sites or dates side by side would be a natural next tab.
 - **Hosting.** The frontend is static files. The backend needs a host that runs Python (see the backend README for CORS).
 

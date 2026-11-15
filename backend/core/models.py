@@ -1,10 +1,41 @@
-from pydantic import BaseModel, Field
+from typing import Annotated, Any
+
+from pydantic import BaseModel, Field, computed_field, model_validator
+
+Latitude = Annotated[float, Field(ge=-90.0, le=90.0)]
+Longitude = Annotated[float, Field(ge=-180.0, le=180.0)]
 
 
 class SiteSummary(BaseModel):
     id: str = Field(min_length=1)
-    lat: float = Field(ge=-90.0, le=90.0)
-    lon: float = Field(ge=-180.0, le=180.0)
+    name: str = ""
+    loc: tuple[Latitude, Longitude] = Field(
+        description="Latitude and longitude in planetocentric degrees."
+    )
+    desc: str = ""
+    agency: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_legacy_coordinates(cls, value: Any) -> Any:
+        if (
+            isinstance(value, dict)
+            and "loc" not in value
+            and "lat" in value
+            and "lon" in value
+        ):
+            value = {**value, "loc": (value["lat"], value["lon"])}
+        return value
+
+    @computed_field
+    @property
+    def lat(self) -> float:
+        return self.loc[0]
+
+    @computed_field
+    @property
+    def lon(self) -> float:
+        return self.loc[1]
 
 
 class PowerMetricsResponse(BaseModel):
@@ -12,6 +43,14 @@ class PowerMetricsResponse(BaseModel):
     start: str
     end: str
     step: str
+    nearest_sunrise_utc: str | None = Field(
+        default=None,
+        description="Next estimated sunrise at or after events_from (or start), in UTC ISO 8601.",
+    )
+    nearest_sunset_utc: str | None = Field(
+        default=None,
+        description="Next estimated sunset at or after events_from (or start), in UTC ISO 8601.",
+    )
     instantaneous_power_per_area_W_m2: list[float] = Field(
         description="Power per unit area for each sampled timestep."
     )

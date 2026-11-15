@@ -21,6 +21,29 @@ const ALT_STATS = [
 
 const errorText = (e) => String(e.message ?? e);
 
+/** ⓘ button that shows the site description on hover, keyboard focus or tap. */
+function InfoTip({ text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className={`info-tip${open ? ' open' : ''}`} onMouseLeave={() => setOpen(false)}>
+      <button
+        type="button"
+        className="icon-btn"
+        aria-label="About this site"
+        aria-describedby="site-description"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+      >
+        i
+      </button>
+      <span id="site-description" role="tooltip" className="info-tip-body">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 /** Right-hand panel for the selected site. */
 export default function SitePanel({ site, time, onTimeChange, onClose }) {
   const power = useSitePower(site, time);
@@ -41,7 +64,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
   const patch = terrain.data;
 
   return (
-    <aside className="site-panel" aria-label={`${site.name} details`}>
+    <aside className="site-panel" aria-label={`${site.fullName} details`}>
       <header className="panel-header">
         <div>
           <div className="panel-badges">
@@ -51,16 +74,17 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
             </span>
           </div>
           <h2>{site.name}</h2>
-          <p className="panel-sub">
-            {site.agency} · {site.notes}
-          </p>
+          <p className="panel-sub">{[site.region, site.agency].filter(Boolean).join(' · ')}</p>
           <Link className="stand-here" to={`/lunarium?site=${encodeURIComponent(site.id)}&t=${encodeURIComponent(time)}`}>
             🧑‍🚀 Stand here · look at the horizon →
           </Link>
         </div>
-        <button className="icon-btn" onClick={onClose} aria-label="Close panel">
-          ✕
-        </button>
+        <div className="panel-actions">
+          {site.description && <InfoTip text={site.description} />}
+          <button className="icon-btn" onClick={onClose} aria-label="Close panel">
+            ✕
+          </button>
+        </div>
       </header>
 
       <section className="panel-section">
@@ -139,15 +163,21 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
       <section className="panel-section">
         <h3>
           Sun &amp; Earth
-          <span className="tag-mock" title="Simplified geometric model run in the browser until the backend provides Sun and Earth data">
-            Mock
+          <span className="tag-mock" title="Sunrise and sunset use JPL Horizons; other Sun/Earth estimates are modeled in the browser">
+            Hybrid
           </span>
         </h3>
         {sky.loading && !sky.data && <p className="muted">Computing…</p>}
         {sky.error && <p className="field-error">{errorText(sky.error)}</p>}
         {sky.data && (
           <div className={sky.loading ? 'is-refreshing' : undefined}>
-            <SkyTiles sky={sky.data} />
+            <SkyTiles
+              sky={sky.data}
+              sunEvents={power.data}
+              selectedTime={time}
+              sunEventsLoading={power.loading}
+              sunEventsError={power.error}
+            />
           </div>
         )}
       </section>
