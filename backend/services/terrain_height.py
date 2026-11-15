@@ -55,8 +55,9 @@ MOON_RADIUS_M = 1_737_400.0   # reference sphere the heights are measured from
 SVS_BASE_URL = "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/"
 VALID_PPD = (4, 16, 64)
 DEFAULT_PPD = 16
-DATA_DIR = Path(os.environ.get("LOLA_DATA_DIR",
-                               Path(__file__).resolve().parent / "data"))
+DATA_DIR = Path(
+    os.environ.get("LOLA_DATA_DIR", Path(__file__).resolve().parents[1] / "data" / "terrain")
+)
  
 # ----------------------------------------------------------------------
 # USER INPUTS for the terrain table (used when this file is run directly)

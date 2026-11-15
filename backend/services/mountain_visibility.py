@@ -28,15 +28,15 @@ The Horizons query and the NASA terrain download have NOT been tested here
 (my sandbox cannot reach them), so check them on your first run.
 """
 import csv
+import math
 from datetime import datetime
 
 import numpy as np
 from astropy.time import Time
-from astroquery.jplhorizons import Horizons
 
-from terrain_height import DEFAULT_PPD, load_elevation_grid
+from services.horizon import earth_series as fetch_earth_series
+from services.terrain_height import DEFAULT_PPD, load_elevation_grid
 
-AU_KM = 149_597_870.7
 EARTH_RADIUS_KM = 6371.0
 MAX_ROWS = 80_000          # stay safely under Horizons' per-request row limit
 
@@ -79,10 +79,18 @@ def parse_datetime(text):
 def check_window(start_dt, end_dt, step):
     if end_dt <= start_dt:
         raise ValueError("END must be after START.")
+    if not step:
+        raise ValueError("STEP must not be empty.")
     unit = {"m": 1 / 1440, "h": 1 / 24, "d": 1.0}.get(step[-1])
     if unit is None:
         raise ValueError("STEP must end in m, h or d, e.g. '30m' or '1h'.")
-    n_rows = (end_dt - start_dt).total_seconds() / 86400 / (float(step[:-1]) * unit)
+    try:
+        step_size = float(step[:-1])
+    except ValueError as exc:
+        raise ValueError("STEP must begin with a positive number.") from exc
+    if not math.isfinite(step_size) or step_size <= 0:
+        raise ValueError("STEP must begin with a positive number.")
+    n_rows = (end_dt - start_dt).total_seconds() / 86400 / (step_size * unit)
     if n_rows > MAX_ROWS:
         raise ValueError(f"{int(n_rows)} Horizons rows requested; use a larger "
                          f"STEP or a shorter window (limit ~{MAX_ROWS}).")
@@ -178,18 +186,7 @@ def find_mountain_sectors(az, sky, crest_dist_km, crest_height_m, threshold_deg)
 def earth_series(lat, lon, start_dt, end_dt, step):
     """Earth's compass direction, height above the flat horizon and distance,
     as seen from the site, at regular steps through the mission."""
-    obj = Horizons(
-        id="399",  # Earth
-        location={"lon": lon, "lat": lat, "elevation": 0.0, "body": 301},
-        epochs={"start": start_dt.strftime("%Y-%m-%d %H:%M"),
-                "stop": end_dt.strftime("%Y-%m-%d %H:%M"),
-                "step": step},
-    )
-    eph = obj.ephemerides(quantities="4,20")   # 4 = az/el, 20 = range
-    return (np.array(eph["datetime_jd"], dtype=float),
-            np.array(eph["AZ"], dtype=float),      # deg from north, clockwise
-            np.array(eph["EL"], dtype=float),      # deg above flat horizontal
-            np.array(eph["delta"], dtype=float) * AU_KM)
+    return fetch_earth_series(lat, lon, start_dt, end_dt, step)
 
 
 def refine_track(jd, az, el, dist_km, step_min):
