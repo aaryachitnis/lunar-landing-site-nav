@@ -1,14 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { SITE_CATEGORIES } from '../../data/mock/sites.js';
 import { useSiteMetrics } from '../../hooks/useSiteMetrics.js';
 import { useTerrainPatch } from '../../hooks/useTerrainPatch.js';
-import { formatLat, formatLon, toDMS, toDateTimeLocal } from '../../utils/format.js';
+import { formatLat, formatLon, toDMS } from '../../utils/format.js';
+import { MAX_TIME_MS, MIN_TIME_MS, clampTime } from '../../utils/time.js';
 import TerrainView from '../TerrainView/TerrainView.jsx';
+import TimePicker from '../TimePicker/TimePicker.jsx';
 import MetricTiles from '../MetricTiles/MetricTiles.jsx';
 import PowerChart from '../PowerChart/PowerChart.jsx';
 import './SitePanel.css';
 
 const TERRAIN = { sizeKm: 80, n: 64 };
+const ALT_STATS = [
+  { key: 'minM', label: 'Min' },
+  { key: 'meanM', label: 'Mean' },
+  { key: 'maxM', label: 'Max' },
+];
 
 /**
  * Right-hand panel for the selected site.
@@ -18,6 +26,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
   const metrics = useSiteMetrics(site, time);
   const terrain = useTerrainPatch(site, TERRAIN);
   const cat = SITE_CATEGORIES[site.category];
+  const [altStat, setAltStat] = useState('meanM');
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose();
@@ -25,7 +34,9 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const shiftDays = (d) => onTimeChange(new Date(new Date(time).getTime() + d * 86400e3).toISOString());
+  const timeMs = Date.parse(time);
+  const shiftDays = (d) => onTimeChange(new Date(clampTime(timeMs + d * 86400e3)).toISOString());
+  const metres = (m) => `${Math.round(m).toLocaleString()} m`;
   const patch = terrain.data;
 
   return (
@@ -43,6 +54,9 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
           <p className="panel-sub">
             {site.agency} · {site.notes}
           </p>
+          <Link className="stand-here" to={`/lunarium?site=${encodeURIComponent(site.id)}&t=${encodeURIComponent(time)}`}>
+            🧑‍🚀 Stand here · look at the horizon →
+          </Link>
         </div>
         <button className="icon-btn" onClick={onClose} aria-label="Close panel">
           ✕
@@ -60,10 +74,26 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
           <dd className="tabular">
             {formatLon(site.lon, 4)} <span className="muted">{toDMS(site.lon, 'E', 'W')}</span>
           </dd>
-          <dt>Elevation</dt>
-          <dd className="tabular">{patch ? `${Math.round(patch.centerElevationM).toLocaleString()} m` : '…'}</dd>
+          <dt>Altitude</dt>
+          <dd className="tabular">{patch ? metres(patch.centerElevationM) : '…'}</dd>
           <dt>Mean slope</dt>
-          <dd className="tabular">{patch ? `${patch.meanSlopeDeg.toFixed(1)}° (central 20 km)` : '…'}</dd>
+          <dd className="tabular">{patch ? `${patch.meanSlopeDeg.toFixed(1)}° (central ${Math.round(patch.centralKm)} km)` : '…'}</dd>
+          <dt>Surface roughness</dt>
+          <dd className="tabular" title="RMS height deviation from the best-fit plane, at the elevation grid's km-scale resolution">
+            {patch ? `${metres(patch.roughnessM)} RMS (central ${Math.round(patch.centralKm)} km)` : '…'}
+          </dd>
+          <dt>Patch altitude</dt>
+          <dd className="alt-stat">
+            <span className="segmented" role="group" aria-label="Altitude statistic">
+              {ALT_STATS.map(({ key, label }) => (
+                <button key={key} type="button" aria-pressed={altStat === key} onClick={() => setAltStat(key)}>
+                  {label}
+                </button>
+              ))}
+            </span>
+            <span className="tabular">{patch ? metres(patch[altStat]) : '…'}</span>
+            {patch && <span className="muted">({patch.sizeKm} km patch)</span>}
+          </dd>
         </dl>
       </section>
 
@@ -83,20 +113,15 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
         <div className="section-head">
           <h3>Conditions</h3>
           <div className="time-controls">
-            <button onClick={() => shiftDays(-1)} aria-label="One day earlier">
+            <button onClick={() => shiftDays(-1)} disabled={timeMs <= MIN_TIME_MS} aria-label="One day earlier">
               −1 d
             </button>
-            <input
-              type="datetime-local"
-              value={toDateTimeLocal(new Date(time))}
-              onChange={(e) => e.target.value && onTimeChange(new Date(e.target.value).toISOString())}
-              aria-label="Selected date and time"
-            />
-            <button onClick={() => shiftDays(1)} aria-label="One day later">
+            <button onClick={() => shiftDays(1)} disabled={timeMs >= MAX_TIME_MS} aria-label="One day later">
               +1 d
             </button>
           </div>
         </div>
+        <TimePicker value={time} onChange={onTimeChange} />
         {metrics.loading && !metrics.data && <p className="muted">Computing…</p>}
         {metrics.error && <p className="field-error">{String(metrics.error.message ?? metrics.error)}</p>}
         {metrics.data && (

@@ -4,8 +4,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import './TerrainView.css';
 
 const VERTICAL_EXAGGERATION = 2;
-const LOW = new THREE.Color('#3a3a37');
-const HIGH = new THREE.Color('#e8e6df');
+// Single-hue ramp (dark navy → pale ice blue) so relief reads as magnitude in the blue theme.
+const LOW = new THREE.Color('#0d1a2b');
+const HIGH = new THREE.Color('#d6e9ff');
 
 /**
  * Bird's-eye 3D view of a local terrain patch (see data/SCHEMA.md → TerrainPatch).
@@ -27,7 +28,7 @@ export default function TerrainView({ patch, sunAzimuth, loading }) {
     host.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#111110');
+    scene.background = new THREE.Color('#000000');
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
     camera.position.set(0, 75, 55);
 
@@ -100,20 +101,20 @@ export default function TerrainView({ patch, sunAzimuth, loading }) {
     const surface = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }));
     const wire = new THREE.Mesh(
       geom,
-      new THREE.MeshBasicMaterial({ color: 0x9ec5ff, wireframe: true, transparent: true, opacity: 0.22, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: 0x1ab2ff, wireframe: true, transparent: true, opacity: 0.28, depthWrite: false }),
     );
     wire.name = 'wire';
     wire.renderOrder = 1;
 
     // Site pin at the centre
-    const pinMat = new THREE.MeshBasicMaterial({ color: 0x3987e5 });
+    const pinMat = new THREE.MeshBasicMaterial({ color: 0x1ab2ff });
     const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 8, 8), pinMat);
     pin.position.y = 4;
     const head = new THREE.Mesh(new THREE.SphereGeometry(1.1, 16, 12), pinMat);
     head.position.y = 8.5;
 
     // North arrow at the north edge
-    const arrow = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4, 12), new THREE.MeshBasicMaterial({ color: 0xf0efec }));
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4, 12), new THREE.MeshBasicMaterial({ color: 0xe6f1ff }));
     arrow.rotation.x = -Math.PI / 2;
     arrow.position.set(0, (maxM - centerElevationM) / 1000 * VERTICAL_EXAGGERATION + 2, -sizeKm / 2 - 4);
 

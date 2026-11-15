@@ -1,17 +1,20 @@
-.power-chart h4 { margin: 8px 0 2px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.power-chart h4 { margin: 8px 0 4px; font-family: var(--mono); font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-secondary); }
+.power-chart .recharts-cartesian-axis-tick text { font-family: var(--mono); }
 .power-chart .recharts-legend-item-text { color: var(--text-secondary) !important; }
 .chart-tooltip {
-  background: var(--surface-1); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 6px 8px; font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), var(--glow);
 }
 .chart-tooltip-title { color: var(--text-muted); margin-bottom: 2px; }
 .chart-tooltip-row { display: grid; grid-template-columns: 10px auto auto; gap: 6px; align-items: center; color: var(--text-primary); }
 .chart-tooltip-row .tabular { text-align: right; }
 .swatch { width: 10px; height: 3px; border-radius: 2px; }
 .chart-table { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
-.chart-table summary { cursor: pointer; }
+.chart-table td { font-family: var(--mono); font-size: 11px; }
+.chart-table summary { cursor: pointer; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; }
+.chart-table summary:hover { color: var(--accent); }
 .chart-table table { width: 100%; border-collapse: collapse; margin-top: 6px; }
 .chart-table th, .chart-table td { text-align: right; padding: 2px 6px; border-bottom: 1px solid var(--border); }
 .chart-table th:first-child, .chart-table td:first-child { text-align: left; }
-.chart-table th { color: var(--text-muted); font-weight: 500; }
+.chart-table th { color: var(--text-muted); font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; }
 .chart-note { margin: 0 0 4px; font-size: 11px; color: var(--text-muted); }

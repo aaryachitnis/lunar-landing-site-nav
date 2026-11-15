@@ -1,16 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { useMoonScene } from '../../hooks/useMoonScene.js';
+import { useLetThereBeLight } from '../../hooks/useLetThereBeLight.js';
+import LightToggle from '../LightToggle/LightToggle.jsx';
 import { SITE_CATEGORIES } from '../../data/mock/sites.js';
 import './MoonView.css';
 
 /**
- * God's-eye globe with HTML site markers.
+ * Landing Sites globe (god's-eye view) with HTML site markers.
  * @param {{ sites: object[], selectedSite: object|null, onSelect: (id) => void, insets: {left:number,right:number} }} props
  */
 export default function MoonView({ sites, selectedSite, onSelect, insets }) {
   const containerRef = useRef(null);
   const markerEls = useRef(new Map());
   const { sceneRef, status } = useMoonScene(containerRef);
+  const { lit, toggle } = useLetThereBeLight(sceneRef);
 
   // Register marker elements with the scene (it positions them every frame).
   useEffect(() => {
@@ -53,6 +56,11 @@ export default function MoonView({ sites, selectedSite, onSelect, insets }) {
           );
         })}
       </div>
+      <LightToggle
+        lit={lit}
+        onToggle={toggle}
+        style={{ left: `calc(${insets.left}px + (100% - ${insets.left + insets.right}px) / 2)` }}
+      />
       {!status.loaded && (
         <div className={`moon-loading${status.error ? ' error' : ''}`}>
           {status.error ?? `Loading lunar maps… ${Math.round(status.progress * 100)}%`}

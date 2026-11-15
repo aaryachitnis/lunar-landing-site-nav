@@ -3,9 +3,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -42,11 +39,7 @@ function TooltipBox({ active, payload, label, unit }) {
   );
 }
 
-/**
- * Two small multiples sharing the time axis (no dual axis):
- *  1. Solar power (W)
- *  2. Sun & Earth elevation relative to the local terrain horizon (°) — above 0 = visible
- */
+/** Solar power (W) over the timeline, plus a daily table. */
 export default function PowerChart({ series }) {
   const data = useMemo(
     () =>
@@ -55,8 +48,6 @@ export default function PowerChart({ series }) {
         .map((p) => ({
           day: p.hoursFromSelected / 24,
           power: p.powerW,
-          sun: p.sunAboveHorizon,
-          earth: p.earthAboveHorizon,
         })),
     [series],
   );
@@ -77,10 +68,10 @@ export default function PowerChart({ series }) {
 
   return (
     <div className="power-chart">
-      <p className="chart-note">Dashed line = selected time. Hover either chart to compare.</p>
+      <p className="chart-note">Dashed line = selected time.</p>
       <h4>Solar power (W)</h4>
       <ResponsiveContainer width="100%" height={130}>
-        <AreaChart data={data} syncId="site-timeline" margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
+        <AreaChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid stroke="var(--border)" strokeOpacity={0.5} vertical={false} />
           <XAxis dataKey="day" type="number" domain={['dataMin', 'dataMax']} ticks={DAY_TICKS} tickFormatter={dayTick} {...axisProps} />
           <YAxis {...axisProps} width={44} />
@@ -88,21 +79,6 @@ export default function PowerChart({ series }) {
           <ReferenceLine x={0} stroke="var(--text-secondary)" strokeDasharray="3 3" />
           <Area dataKey="power" name="Power" type="stepAfter" stroke="var(--series-power)" strokeWidth={2} fill="var(--series-power)" fillOpacity={0.18} isAnimationActive={false} />
         </AreaChart>
-      </ResponsiveContainer>
-
-      <h4>Elevation above local horizon (°)</h4>
-      <ResponsiveContainer width="100%" height={160}>
-        <LineChart data={data} syncId="site-timeline" margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
-          <CartesianGrid stroke="var(--border)" strokeOpacity={0.5} vertical={false} />
-          <XAxis dataKey="day" type="number" domain={['dataMin', 'dataMax']} ticks={DAY_TICKS} tickFormatter={dayTick} {...axisProps} />
-          <YAxis {...axisProps} width={44} tickFormatter={(v) => `${v}°`} />
-          <Tooltip content={<TooltipBox unit="°" />} cursor={{ stroke: 'var(--text-muted)' }} />
-          <ReferenceLine y={0} stroke="var(--text-secondary)" label={{ value: 'horizon', fill: 'var(--text-muted)', fontSize: 10, position: 'insideBottomLeft' }} />
-          <ReferenceLine x={0} stroke="var(--text-secondary)" strokeDasharray="3 3" />
-          <Line dataKey="sun" name="Sun" stroke="var(--series-sun)" strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Line dataKey="earth" name="Earth" stroke="var(--series-earth)" strokeWidth={2} dot={false} isAnimationActive={false} />
-          <Legend verticalAlign="top" align="right" height={20} iconType="plainline" wrapperStyle={{ fontSize: 12, color: 'var(--text-secondary)' }} />
-        </LineChart>
       </ResponsiveContainer>
 
       <details className="chart-table">
