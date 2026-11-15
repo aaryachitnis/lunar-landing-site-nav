@@ -50,8 +50,8 @@ its observed duration.
 
 ## Tests
 
-Run the backend unit tests from this directory:
+From the repository root, run:
 
 ```powershell
-python -m unittest discover -s tests -v
+python -m unittest discover -s backend/tests -t backend -v
 ```
