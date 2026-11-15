@@ -1,0 +1,11 @@
+{
+  "dataset": "LOLA LDEM_16 (NASA SVS 4720)",
+  "width": 5760,
+  "height": 2880,
+  "ppd": 16,
+  "resolution_m_at_equator": 1895.2,
+  "min_m": -8982,
+  "max_m": 10686,
+  "units": "metres above a 1737.4 km sphere",
+  "layout": "row 0 = 90N, column 0 = 180W, little-endian int16"
+}
