@@ -35,8 +35,10 @@ the astronomical horizon unless the field says `AboveHorizon` (relative to the l
     "sunElevation": 1.2, "sunAzimuth": 210.5, "sunAboveHorizon": 0.8,
     "earthElevation": 4.1, "earthAzimuth": 2.3, "earthAboveHorizon": 3.6,
     "sunUp": true, "earthUp": true, "powerW": 816.6,
-    "hoursToSunTransition": 52,      // hours to sunset if sunUp, else to sunrise; null if not within window
-    "hoursToEarthTransition": 130    // hours to Earthset if earthUp, else to Earthrise
+    "hoursToSunrise": 410,           // hours to the next sunrise; null if not within window
+    "hoursToSunset": 52,             // hours to the next sunset; null if not within window
+    "hoursToEarthrise": 300,         // hours to the next Earthrise; null if not within window
+    "hoursToEarthset": 130           // hours to the next Earthset; null if not within window
   },
   "window": {
     "days": 27,
@@ -65,10 +67,12 @@ column 0 = west edge). `heights` is row-major, metres relative to the 1737.4 km 
 {
   "sizeKm": 80, "n": 64, "spacingM": 1270,
   "heights": "Float32Array(n*n) — JSON: number[]",
-  "minM": -4200, "maxM": 1900,
+  "minM": -4200, "maxM": 1900, "meanM": -310,   // min / max / mean altitude over the whole patch
   "centerElevationM": 1450,
-  "meanSlopeDeg": 4.2,
-  "sourceResolutionM": 1895,
+  "meanSlopeDeg": 4.2,                          // over the central area (centralKm)
+  "roughnessM": 85,                             // RMS height deviation from best-fit plane, central area
+  "centralKm": 19,                              // side of the central square used for slope + roughness
+  "sourceResolutionM": 1895,               // 1895 for ldem_16, ~474 for ldem_64
   "source": "LOLA ldem_16 (bilinear)"
 }
 ```

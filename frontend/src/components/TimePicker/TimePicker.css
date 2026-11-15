@@ -1,0 +1,11 @@
+.time-picker { margin-bottom: 8px; }
+.time-picker-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.time-picker-fields select,
+.time-picker-fields input {
+  padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); font-size: 12px;
+}
+.time-picker-year { width: 4.5em; }
+.time-picker-year[aria-invalid='true'] { border-color: var(--critical); }
+.time-picker-fields .muted { font-size: 12px; }
+.time-picker-note { margin: 4px 0 0; font-size: 11px; }
+.time-picker .field-error { margin: 4px 0 0; }

@@ -22,11 +22,19 @@
 .kv dd { margin: 0; }
 .kv .muted { color: var(--text-muted); font-size: 12px; margin-left: 4px; }
 .panel-caption { margin: 6px 0 0; font-size: 11px; color: var(--text-muted); }
+.alt-stat { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.alt-stat .muted { margin-left: 0; }
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.segmented button { padding: 2px 8px; font-size: 11px; background: var(--surface-2); color: var(--text-secondary); border: 0; }
+.segmented button + button { border-left: 1px solid var(--border); }
+.segmented button:hover { background: var(--surface-3); }
+.segmented button[aria-pressed='true'] { background: var(--surface-3); color: var(--text-primary); font-weight: 600; }
 .time-controls { display: flex; gap: 4px; }
 .time-controls button, .time-controls input {
   padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); font-size: 12px;
 }
-.time-controls button:hover { background: var(--surface-3); }
+.time-controls button:hover:not(:disabled) { background: var(--surface-3); }
+.time-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
 .is-refreshing { opacity: 0.6; transition: opacity 0.2s; }
 
 @media (max-width: 760px) {

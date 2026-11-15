@@ -1,10 +1,11 @@
-import { formatDeg, formatDuration, formatPct } from '../../utils/format.js';
+import { formatDeg, formatDuration } from '../../utils/format.js';
 import './MetricTiles.css';
 
-function Status({ ok, yes, no }) {
+/** Yes/No with an icon so status never relies on colour alone. */
+function YesNo({ ok }) {
   return (
-    <span className={`status ${ok ? 'status-good' : 'status-critical'}`}>
-      <span aria-hidden="true">{ok ? '●' : '○'}</span> {ok ? yes : no}
+    <span className={`yes-no ${ok ? 'status-good' : 'status-critical'}`}>
+      <span aria-hidden="true">{ok ? '●' : '○'}</span> {ok ? 'Yes' : 'No'}
     </span>
   );
 }
@@ -24,26 +25,20 @@ function Tile({ label, value, sub, children }) {
 export default function MetricTiles({ metrics }) {
   const { now, window: w, panel } = metrics;
   const windowNote = `next ${w.days} d`;
+  const vsTerrain = (above) => `${above >= 0 ? '+' : ''}${above.toFixed(1)}° vs terrain`;
+  const until = (label, hours) => (
+    <Tile label={label} value={formatDuration(hours)} sub={hours == null ? `not within ${windowNote}` : 'incl. terrain horizon'} />
+  );
   return (
     <div className="tiles">
-      <Tile label="Sun elevation" value={formatDeg(now.sunElevation)} sub={`az ${formatDeg(now.sunAzimuth, 0)} · ${now.sunAboveHorizon >= 0 ? '+' : ''}${now.sunAboveHorizon.toFixed(1)}° vs terrain`}>
-        <Status ok={now.sunUp} yes="Sunlit" no="In shadow" />
-      </Tile>
-      <Tile
-        label={now.sunUp ? 'Time to sunset' : 'Time to sunrise'}
-        value={formatDuration(now.hoursToSunTransition)}
-        sub={now.hoursToSunTransition == null ? `not within ${windowNote}` : 'incl. terrain horizon'}
-      />
-      <Tile label="Earth elevation" value={formatDeg(now.earthElevation)} sub={`az ${formatDeg(now.earthAzimuth, 0)} · ${now.earthAboveHorizon >= 0 ? '+' : ''}${now.earthAboveHorizon.toFixed(1)}° vs terrain`}>
-        <Status ok={now.earthUp} yes="Direct-to-Earth" no="No Earth link" />
-      </Tile>
-      <Tile
-        label={now.earthUp ? 'Time to Earthset' : 'Time to Earthrise'}
-        value={formatDuration(now.hoursToEarthTransition)}
-        sub={now.hoursToEarthTransition == null ? `not within ${windowNote}` : 'incl. terrain horizon'}
-      />
-      <Tile label="Sunlit" value={formatPct(w.illuminatedFraction)} sub={windowNote} />
-      <Tile label="Earth visible" value={formatPct(w.earthVisibleFraction)} sub={windowNote} />
+      <Tile label="Sun altitude" value={formatDeg(now.sunElevation)} sub={`az ${formatDeg(now.sunAzimuth, 0)} · ${vsTerrain(now.sunAboveHorizon)}`} />
+      <Tile label="Sun visible" value={<YesNo ok={now.sunUp} />} sub="at selected time · terrain horizon" />
+      {until('Time to sunset', now.hoursToSunset)}
+      {until('Time to sunrise', now.hoursToSunrise)}
+      <Tile label="Earth altitude" value={formatDeg(now.earthElevation)} sub={`az ${formatDeg(now.earthAzimuth, 0)} · ${vsTerrain(now.earthAboveHorizon)}`} />
+      <Tile label="Earth visible" value={<YesNo ok={now.earthUp} />} sub="at selected time · terrain horizon" />
+      {until('Time to Earthset', now.hoursToEarthset)}
+      {until('Time to Earthrise', now.hoursToEarthrise)}
       <Tile label="Mean power" value={`${Math.round(w.meanPowerW)} W`} sub={`${Math.round(w.energyKWh)} kWh ${windowNote}`} />
       <Tile label="Longest darkness" value={formatDuration(w.longestDarknessH)} sub={windowNote} />
       <p className="tiles-note">

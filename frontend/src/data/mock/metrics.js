@@ -3,7 +3,7 @@
 //   • Sun: subsolar longitude from the synodic phase (reference new moon 2000-01-06 18:14 UTC),
 //     subsolar latitude ±1.54° over the draconic year.
 //   • Earth: sub-Earth point wobbles with optical libration (±7.9° lon, ±6.7° lat).
-//   • Horizon: ray-marched from real LOLA elevation (ldem_16, ~1.9 km/px) incl. surface curvature.
+//   • Horizon: ray-marched from real LOLA elevation (ldem_16 or ldem_64, see fetch-textures.mjs) incl. surface curvature.
 //   • Power: sun-tracking panel, 2 m² at 30% efficiency, scaled by visible fraction of the solar disk.
 // Not ephemeris-grade. Output shape documented in data/SCHEMA.md.
 
@@ -110,12 +110,17 @@ export function computeSiteMetrics(grid, site, date, { daysBefore = 3, days = 30
   const future = series.slice(i0);
 
   // Time until a condition flips (sunset/sunrise, Earthset/Earthrise) within the window.
-  const timeUntil = (pred) => {
-    const k = future.findIndex(pred);
-    return k < 0 ? null : future[k].hoursFromSelected;
+  // Hours until the next time `isUp` changes to `toUp` (rise if true, set if false); null if not in window.
+  const timeUntilEdge = (isUp, toUp) => {
+    for (let k = 1; k < future.length; k++) {
+      if (isUp(future[k]) === toUp && isUp(future[k - 1]) !== toUp) return future[k].hoursFromSelected;
+    }
+    return null;
   };
-  const sunUp = now.illumination > 0.5;
-  const earthUp = now.earthVisible;
+  const sunIsUp = (p) => p.illumination > 0.5;
+  const earthIsUp = (p) => p.earthVisible;
+  const sunUp = sunIsUp(now);
+  const earthUp = earthIsUp(now);
 
   let longestDark = 0;
   let run = 0;
@@ -140,9 +145,11 @@ export function computeSiteMetrics(grid, site, date, { daysBefore = 3, days = 30
       sunUp,
       earthUp,
       powerW: now.powerW,
-      // Hours to the next transition; null if it doesn't happen within the window.
-      hoursToSunTransition: timeUntil((p) => p.illumination > 0.5 !== sunUp),
-      hoursToEarthTransition: timeUntil((p) => p.earthVisible !== earthUp),
+      // Hours to the next event of each kind (terrain horizon included); null if not within the window.
+      hoursToSunrise: timeUntilEdge(sunIsUp, true),
+      hoursToSunset: timeUntilEdge(sunIsUp, false),
+      hoursToEarthrise: timeUntilEdge(earthIsUp, true),
+      hoursToEarthset: timeUntilEdge(earthIsUp, false),
     },
     window: {
       days: days - daysBefore,
