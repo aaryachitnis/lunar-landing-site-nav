@@ -67,6 +67,13 @@ export class MoonScene {
     sun.position.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)).multiplyScalar(5);
     this.scene.add(sun, sun.target);
 
+    // Night-side fill ("Let there be light"): starts at zero so the default look is unchanged.
+    this.nightFill = new THREE.DirectionalLight(0xffffff, 0);
+    this.nightFill.position.copy(sun.position).negate();
+    this.nightAmbient = new THREE.AmbientLight(0xffffff, 0);
+    this.scene.add(this.nightFill, this.nightFill.target, this.nightAmbient);
+    this.nightLight = { level: 0, target: 0, last: performance.now() };
+
     this.scene.add(this.#makeStars());
 
     // Moon
@@ -185,6 +192,24 @@ export class MoonScene {
     else this.camera.setViewOffset(w + 2 * Math.abs(d), h, d > 0 ? 2 * d : 0, 0, w, h);
   }
 
+  /** Fade the night-side fill lights on or off. */
+  setNightSideLit(on) {
+    this.nightLight.target = on ? 1 : 0;
+  }
+
+  #applyNightLight() {
+    const n = this.nightLight;
+    const now = performance.now();
+    const dt = now - n.last;
+    n.last = now;
+    if (n.level === n.target) return;
+    const step = dt / C.NIGHT_FILL.transitionMs;
+    n.level = n.target > n.level ? Math.min(n.target, n.level + step) : Math.max(n.target, n.level - step);
+    const k = n.level * n.level * (3 - 2 * n.level); // smoothstep
+    this.nightFill.intensity = C.NIGHT_FILL.intensity * k;
+    this.nightAmbient.intensity = C.NIGHT_FILL.ambient * k;
+  }
+
   resetView() {
     this.flyTo(C.DEFAULT_VIEW.lat, C.DEFAULT_VIEW.lon, C.DEFAULT_VIEW.distance);
   }
@@ -204,6 +229,7 @@ export class MoonScene {
       }
     }
     this.#applyShift();
+    this.#applyNightLight();
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
     this.#updateMarkers();

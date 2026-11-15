@@ -30,8 +30,4 @@ export function formatDuration(hours) {
 export const formatDeg = (v, digits = 1) => (v == null ? '—' : `${v.toFixed(digits)}°`);
 export const formatPct = (v) => (v == null ? '—' : `${Math.round(v * 100)}%`);
 
-/** Date → value for <input type="datetime-local"> (local time, minute precision). */
-export function toDateTimeLocal(date) {
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+// Date/time formatting and validation live in utils/time.js.

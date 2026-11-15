@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { routes } from '../routes.jsx';
 import logo from '../assets/logo.svg';
+import MissionClock from '../components/MissionClock/MissionClock.jsx';
 import './AppLayout.css';
 
 export default function AppLayout() {
@@ -18,6 +19,7 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
+        <MissionClock />
       </header>
       <main className="app-main">
         <Outlet />

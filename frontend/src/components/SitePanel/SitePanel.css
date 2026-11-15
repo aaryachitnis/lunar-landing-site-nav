@@ -1,34 +1,83 @@
 .site-panel {
   position: absolute; top: 0; right: 0; bottom: 0; width: 420px; max-width: 100%; z-index: 6;
-  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px;
-  background: color-mix(in srgb, var(--surface-1) 96%, transparent); backdrop-filter: blur(8px);
-  border-left: 1px solid var(--border);
+  overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 18px;
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent); backdrop-filter: blur(8px);
+  border-left: 1px solid var(--border-strong);
   animation: panel-in 0.25s ease-out;
 }
 @keyframes panel-in { from { transform: translateX(24px); opacity: 0; } }
-.panel-header { display: flex; justify-content: space-between; gap: 12px; }
-.panel-header h2 { margin: 6px 0 2px; font-size: 20px; }
-.panel-sub { margin: 0; color: var(--text-secondary); font-size: 13px; }
+.panel-header { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.panel-header h2 {
+  margin: 6px 0 2px; font-family: var(--display); font-size: 17px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.panel-sub { margin: 0; color: var(--text-secondary); font-size: 14px; }
 .panel-badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-secondary);
+}
 .badge .cat-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
-.icon-btn { flex: none; width: 30px; height: 30px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-secondary); }
-.icon-btn:hover { color: var(--text-primary); }
-.panel-section h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
-.section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.icon-btn {
+  flex: none; width: 30px; height: 30px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-secondary);
+}
+.icon-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Section headings: "LOCATION ────────" (same font as the "Landing sites" title) */
+.panel-section h3 {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  font-family: var(--display); font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.16em; color: var(--accent);
+}
+.panel-section > h3::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .section-head h3 { margin: 0; }
-.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
-.kv dt { color: var(--text-muted); }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 14px; }
+/* Labels and values use the "Landing sites" title font (Orbitron). It runs wide, so sizes are smaller. */
+.kv dt { font-family: var(--display); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); align-self: center; }
+/* Values: monospace telemetry readout (more legible than Orbitron at small sizes). */
+.site-panel .kv .tabular { font-family: var(--mono); font-size: 13px; font-weight: 500; letter-spacing: 0; }
 .kv dd { margin: 0; }
 .kv .muted { color: var(--text-muted); font-size: 12px; margin-left: 4px; }
-.panel-caption { margin: 6px 0 0; font-size: 11px; color: var(--text-muted); }
+.panel-caption { margin: 6px 0 0; font-family: var(--mono); font-size: 10.5px; color: var(--text-muted); }
+
+.alt-stat { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.alt-stat .muted { margin-left: 0; }
+.segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+.segmented button {
+  padding: 2px 8px; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em;
+  background: var(--surface-2); color: var(--text-secondary); border: 0;
+}
+.segmented button + button { border-left: 1px solid var(--border-strong); }
+.segmented button:hover { background: var(--surface-3); color: var(--text-primary); }
+.segmented button[aria-pressed='true'] { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+
 .time-controls { display: flex; gap: 4px; }
 .time-controls button, .time-controls input {
-  padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); font-size: 12px;
+  padding: 4px 8px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-2);
+  font-family: var(--mono); font-size: 11px;
 }
-.time-controls button:hover { background: var(--surface-3); }
+.time-controls button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.time-controls button:disabled { opacity: 0.4; cursor: not-allowed; }
 .is-refreshing { opacity: 0.6; transition: opacity 0.2s; }
 
 @media (max-width: 760px) {
-  .site-panel { top: auto; height: 65%; width: 100%; border-left: 0; border-top: 1px solid var(--border); }
+  .site-panel { top: auto; height: 65%; width: 100%; border-left: 0; border-top: 1px solid var(--border-strong); }
 }
+
+.stand-here {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-dim);
+  color: var(--accent);
+  text-decoration: none;
+  font: 600 12px/1.2 var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.stand-here:hover { box-shadow: var(--glow); }

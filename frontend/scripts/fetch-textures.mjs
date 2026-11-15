@@ -21,9 +21,18 @@ const OUT = path.join(here, '..', 'public', 'textures');
 const BASE = 'https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720';
 
 const COLOR_SRC = 'lroc_color_poles_4k.tif'; // 4096x2048 RGB, ~13 MB
-const ELEV_SRC = 'ldem_16.tif'; // 5760x2880 float32, km relative to 1737.4 km, ~66 MB
 
 const MOON_RADIUS_KM = 1737.4;
+
+// ── Terrain resolution: the ONLY line to change to swap the elevation source ──
+// 16 → ldem_16.tif:  5760×2880 float32 km, ~66 MB source, ~1.9 km/px, ~33 MB moon_elev_i16.bin
+// 64 → ldem_64.tif: 23040×11520 float32 km, ~1 GB source, ~474 m/px, ~530 MB moon_elev_i16.bin
+//      (the browser downloads that bin when a site panel opens; the build needs several GB of RAM)
+const ELEV_PPD = 16; // pixels per degree
+const ELEV_SRC = `ldem_${ELEV_PPD}.tif`;
+const ELEV_W = 360 * ELEV_PPD;
+const ELEV_H = 180 * ELEV_PPD;
+const ELEV_RES_M = ((Math.PI * MOON_RADIUS_KM) / ELEV_H) * 1000; // metres per pixel (latitude)
 const NORMAL_STRENGTH = 3; // bakes a mild slope exaggeration; tweak live via normalScale in the GUI
 const OUT_W = 4096;
 const OUT_H = 2048;
@@ -33,7 +42,15 @@ const DISP_H = 1024;
 const OUTPUTS = ['moon_color.jpg', 'moon_disp.png', 'moon_normal.png', 'moon_elev_i16.bin', 'moon_meta.json'];
 
 const args = new Set(process.argv.slice(2));
-if (args.has('--if-missing') && OUTPUTS.every((f) => fs.existsSync(path.join(OUT, f)))) {
+const builtPpd = () => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(OUT, 'moon_meta.json'), 'utf8')).elevation.pixelsPerDegree ?? 16;
+  } catch {
+    return null;
+  }
+};
+// Skip only if everything exists AND was built at the configured resolution (so changing ELEV_PPD rebuilds).
+if (args.has('--if-missing') && OUTPUTS.every((f) => fs.existsSync(path.join(OUT, f))) && builtPpd() === ELEV_PPD) {
   console.log('[textures] already generated, skipping (run `npm run textures` to rebuild)');
   process.exit(0);
 }
@@ -78,10 +95,17 @@ async function buildColor(src) {
 
 async function readElevation(src) {
   const buf = fs.readFileSync(src);
-  const tiff = await fromArrayBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  // Avoid copying the file buffer when it isn't a slice of a shared pool (matters for the ~1 GB ldem_64).
+  const ab = buf.byteOffset === 0 && buf.byteLength === buf.buffer.byteLength ? buf.buffer : buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  const tiff = await fromArrayBuffer(ab);
   const image = await tiff.getImage();
-  const [h] = await image.readRasters();
-  return { w: image.getWidth(), h: image.getHeight(), data: Float32Array.from(h) };
+  const w = image.getWidth();
+  const h = image.getHeight();
+  if (w !== ELEV_W || h !== ELEV_H) {
+    throw new Error(`[textures] ${ELEV_SRC} is ${w}×${h}, expected ${ELEV_W}×${ELEV_H} for ELEV_PPD = ${ELEV_PPD}`);
+  }
+  const [band] = await image.readRasters();
+  return { w, h, data: band instanceof Float32Array ? band : Float32Array.from(band) };
 }
 
 async function buildDisplacement({ w, h, data }) {
@@ -105,8 +129,18 @@ async function buildDisplacement({ w, h, data }) {
         radiusKm: MOON_RADIUS_KM,
         minKm: min,
         maxKm: max,
-        elevation: { file: 'moon_elev_i16.bin', width: w, height: h, units: 'm', type: 'int16le', layout: 'equirectangular, row 0 = 90N, col 0 = 180W' },
-        source: 'NASA SVS 4720 (LOLA ldem_16)',
+        elevation: {
+          file: 'moon_elev_i16.bin',
+          width: w,
+          height: h,
+          pixelsPerDegree: ELEV_PPD,
+          resolutionM: ELEV_RES_M,
+          dataset: `LOLA ldem_${ELEV_PPD}`,
+          units: 'm',
+          type: 'int16le',
+          layout: 'equirectangular, row 0 = 90N, col 0 = 180W',
+        },
+        source: `NASA SVS 4720 (LOLA ldem_${ELEV_PPD})`,
       },
       null,
       2,

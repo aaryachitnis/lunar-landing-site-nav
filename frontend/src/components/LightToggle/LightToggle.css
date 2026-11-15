@@ -1,0 +1,16 @@
+.light-toggle {
+  position: absolute; bottom: 32px; transform: translateX(-50%); z-index: 4;
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 10px;
+  border-radius: var(--radius); border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent); backdrop-filter: blur(6px);
+  color: var(--text-secondary); font-family: var(--mono); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.14em; white-space: nowrap;
+  transition: left 0.3s ease, color 0.2s, border-color 0.2s, box-shadow 0.3s;
+}
+.light-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.light-toggle:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.light-toggle-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; transition: transform 0.6s ease; }
+/* Sun stays amber: it identifies the Sun, not the UI theme */
+.light-toggle.on { color: var(--text-primary); border-color: var(--series-sun); box-shadow: 0 0 18px color-mix(in srgb, var(--series-sun) 35%, transparent); }
+.light-toggle.on .light-toggle-icon { stroke: var(--series-sun); fill: color-mix(in srgb, var(--series-sun) 30%, transparent); transform: rotate(45deg); }
+@media (prefers-reduced-motion: reduce) { .light-toggle, .light-toggle-icon { transition: none; } }

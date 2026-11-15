@@ -1,11 +1,12 @@
-.terrain-view { position: relative; height: 240px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+.terrain-view { position: relative; height: 240px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border-strong); background: #000; }
 .terrain-canvas { position: absolute; inset: 0; cursor: grab; }
 .terrain-canvas:active { cursor: grabbing; }
 .terrain-canvas canvas { display: block; }
-.terrain-overlay { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-secondary); background: rgba(17, 17, 16, 0.7); }
+.terrain-overlay { position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent); background: rgba(0, 0, 0, 0.7); font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.16em; }
 .terrain-hud {
   position: absolute; left: 8px; right: 8px; bottom: 6px; display: flex; justify-content: space-between; align-items: center;
-  font-size: 11px; color: var(--text-secondary); pointer-events: none;
+  font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); pointer-events: none;
 }
-.terrain-hud > * { background: rgba(17, 17, 16, 0.78); padding: 2px 6px; border-radius: 4px; }
+.terrain-hud > * { background: rgba(0, 0, 0, 0.8); border: 1px solid var(--border); padding: 2px 6px; border-radius: 2px; }
+.terrain-hud input { accent-color: var(--accent); }
 .terrain-hud label { pointer-events: auto; display: flex; gap: 4px; align-items: center; }

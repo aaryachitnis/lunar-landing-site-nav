@@ -1,0 +1,6 @@
+.mission-clock { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.mission-clock strong { color: var(--accent); font-weight: 500; }
+.mission-clock-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: var(--glow); animation: clock-pulse 2s ease-in-out infinite; }
+@keyframes clock-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .mission-clock-dot { animation: none; } }
+@media (max-width: 560px) { .mission-clock .tabular > :not(strong) { display: none; } .mission-clock { font-size: 11px; } }

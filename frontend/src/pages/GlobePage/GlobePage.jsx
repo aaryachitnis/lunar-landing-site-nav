@@ -4,7 +4,6 @@ import SiteList from '../../components/SiteList/SiteList.jsx';
 import SitePanel from '../../components/SitePanel/SitePanel.jsx';
 import { useSites } from '../../hooks/useSites.js';
 import { useSelectedSite } from '../../hooks/useSelectedSite.js';
-import { parseCustomSiteId } from '../../data/mock/sites.js';
 import './GlobePage.css';
 
 const PANEL_W = 420;
@@ -34,12 +33,7 @@ export default function GlobePage() {
     return d.toISOString();
   }, []);
 
-  // Custom sites come from the URL id, so a shared link restores them.
-  const sites = useMemo(() => {
-    const list = fetchedSites ?? [];
-    const custom = parseCustomSiteId(siteId);
-    return custom && !list.some((s) => s.id === custom.id) ? [...list, custom] : list;
-  }, [fetchedSites, siteId]);
+  const sites = useMemo(() => fetchedSites ?? [], [fetchedSites]);
 
   const selectedSite = sites.find((s) => s.id === siteId) ?? null;
   const close = useCallback(() => clearSite(), [clearSite]);
@@ -56,7 +50,6 @@ export default function GlobePage() {
         loading={loading}
         selectedId={siteId}
         onSelect={selectSite}
-        onAddCustom={(s) => selectSite(s.id)}
         collapsed={listCollapsed || (narrow && !!selectedSite)}
         onToggle={() => setListCollapsed((c) => !c)}
       />
