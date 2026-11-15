@@ -22,7 +22,6 @@ function Tile({ label, value, sub }) {
 
 const wm2 = (v) => (v == null ? '…' : `${v < 10 ? v.toFixed(1) : Math.round(v)} W/m²`);
 
-/** Live solar power from the backend. See SCHEMA.md → SitePower. */
 export function PowerTiles({ power }) {
   const days = power.daily.length;
   return (

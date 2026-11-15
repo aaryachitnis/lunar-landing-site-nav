@@ -1,4 +1,3 @@
-// HTTP client for the FastAPI backend (see backend/README.md).
 // In dev, Vite proxies /api to http://127.0.0.1:8000. In production set VITE_API_BASE.
 
 export const API_BASE = (import.meta.env?.VITE_API_BASE ?? '/api').replace(/\/$/, '');
@@ -22,7 +21,6 @@ export async function fetchJson(path, params, options) {
   return body;
 }
 
-/** Send a JSON request body and return the decoded backend response. */
 export function postJson(path, body) {
   return fetchJson(path, null, {
     method: 'POST',

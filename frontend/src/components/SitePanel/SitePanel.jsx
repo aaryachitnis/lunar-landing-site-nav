@@ -21,7 +21,6 @@ const ALT_STATS = [
 
 const errorText = (e) => String(e.message ?? e);
 
-/** ⓘ button that shows the site description on hover, keyboard focus or tap. */
 function InfoTip({ text }) {
   const [open, setOpen] = useState(false);
   return (
@@ -44,7 +43,6 @@ function InfoTip({ text }) {
   );
 }
 
-/** Right-hand panel for the selected site. */
 export default function SitePanel({ site, time, onTimeChange, onClose }) {
   const power = useSitePower(site, time);
   const sky = useSkyModel(site, time);

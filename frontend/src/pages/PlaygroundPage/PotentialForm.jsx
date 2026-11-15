@@ -5,11 +5,7 @@ import { useSites } from '../../hooks/useSites.js';
 
 const TILE_SIZES = [20, 40, 80];
 
-/**
- * Left column of the sketch: coordinates, other parameters and "Calculate potential".
- * Values are kept as strings so inputs can be mid-edit; validation happens in validateForm().
- * @param {{ values: object, errors: object, onChange: (patch: object) => void, onSubmit: () => void, busy: boolean, canAddSite: boolean }} props
- */
+/** Values stay strings so inputs can be mid-edit; validateForm() parses them. */
 export default function PotentialForm({
   values,
   errors,

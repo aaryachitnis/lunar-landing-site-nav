@@ -1,8 +1,5 @@
-// First-person three.js scene for Lunarium.
-// Local frame: x = east, y = up, z = -north, metres; origin on the ground at the site.
-// Three passes (sky, far terrain, near terrain), each with its own depth range, so ridges hide
-// the Sun and Earth. Renders only when something changes; distant-ridge shadows are computed in
-// a worker only when the Sun moves.
+// Lunarium's first-person scene. Frame: x = east, y = up, z = -north, metres, origin at the site.
+// Renders on demand; distant-ridge shadows come from a worker, recomputed only when the Sun moves.
 
 import * as THREE from 'three';
 import { MOON_RADIUS_KM } from '../utils/coords.js';
@@ -190,11 +187,7 @@ function visTexture(n, data = new Uint8Array(n * n).fill(255)) {
   return t;
 }
 
-/**
- * Terrain self-shadowing from distant ridges. Sun visibility is precomputed (in a worker, only
- * when the Sun moves) on grids over the mid and far layers; the vertex shader just looks it up.
- * Direct light is scaled by it. Shadow maps still handle rocks close by.
- */
+/** Distant-ridge shadows: per-vertex lookup of the worker's Sun visibility grids. Shadow maps handle rocks. */
 function addTerrainShadow(material, shared) {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, shared);
@@ -537,9 +530,7 @@ export class HorizonScene {
     this.#requestVisibility(); // catch up if the Sun moved meanwhile
   }
 
-  /**
-   * @param {{sunAz, sunEl, sunFrac, earthAz, earthEl}} s positions (deg) and visible Sun fraction at the viewer
-   */
+  /** @param {{sunAz, sunEl, sunFrac, earthAz, earthEl}} s positions (deg) and visible Sun fraction */
   setBodies({ sunAz, sunEl, sunFrac, earthAz, earthEl }) {
     const b = this.bodies;
     if (b.sunAz === sunAz && b.sunEl === sunEl && b.earthAz === earthAz && b.earthEl === earthEl) return;

@@ -1,7 +1,3 @@
-// Turns the backend's sites into what the UI shows. The backend provides the name, agency and
-// description; this adds a category, splits the name into mission and region, and links the
-// site to Lunarium's terrain pack for the same place.
-
 import { MOCK_SITES } from './mock/sites.js';
 
 export const SITE_CATEGORIES = {
@@ -28,7 +24,6 @@ function splitName(fullName) {
   return m ? { mission: m[1], region: m[2] } : { mission: fullName, region: null };
 }
 
-/** Backend site ({ id, name, desc, agency, lat, lon }) → the Site shape in SCHEMA.md. */
 export function describeSite(site, index) {
   const fullName = site.name || site.id;
   const { mission, region } = splitName(fullName);

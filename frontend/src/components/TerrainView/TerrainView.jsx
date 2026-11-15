@@ -8,10 +8,7 @@ const VERTICAL_EXAGGERATION = 2;
 const LOW = new THREE.Color('#0d1a2b');
 const HIGH = new THREE.Color('#d6e9ff');
 
-/**
- * Bird's-eye 3D view of a local terrain patch (see data/SCHEMA.md → TerrainPatch).
- * Local frame: x = east, y = up, -z = north. Units: km.
- */
+/** Bird's-eye 3D terrain patch. Frame: x = east, y = up, -z = north, km. */
 export default function TerrainView({ patch, sunAzimuth, loading }) {
   const hostRef = useRef(null);
   const ctxRef = useRef(null);

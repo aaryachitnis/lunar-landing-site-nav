@@ -1,11 +1,5 @@
-// Selected-time rules shared by the URL state and the panel's date picker.
-//
-// • All times are UTC. (Local time zones are meaningless thousands of years ago, and the
-//   browser applies odd historical "local mean time" offsets before ~1900.)
-// • Calendar: proleptic Gregorian, as JavaScript's Date uses, not Julian before 1582.
-// • Era years ↔ astronomical years: 1 AD = 1, 1 BC = 0, 9999 BC = −9998 (no year zero in BC/AD).
-// • Supported range: 1 Jan 9999 BC 00:00 UTC … 31 Dec 9999 AD 23:59 UTC.
-//   Gotcha: Date.UTC(y, …) maps years 0–99 to 1900–1999, so always build dates with setUTCFullYear.
+// All times are UTC, proleptic Gregorian, 9999 BC to 9999 AD. Astronomical years: 1 BC = 0.
+// Build dates with setUTCFullYear: Date.UTC maps years 0–99 to 1900–1999.
 
 export const MAX_ERA_YEAR = 9999;
 
@@ -31,10 +25,7 @@ export const daysInMonth = (astroYear, month) => new Date(utcMs(astroYear, month
 export const isInRange = (ms) => Number.isFinite(ms) && ms >= MIN_TIME_MS && ms <= MAX_TIME_MS;
 export const clampTime = (ms) => Math.min(Math.max(ms, MIN_TIME_MS), MAX_TIME_MS);
 
-/**
- * Validate a `?t=` value. Returns a clamped ISO string, or null if it isn't a date at all.
- * Accepts ISO 8601 including expanded years (e.g. "-009998-01-01T00:00:00.000Z").
- */
+/** Validate a `?t=` value (ISO 8601, expanded years allowed): clamped ISO string, or null. */
 export function sanitizeTime(value) {
   if (!value) return null;
   const ms = Date.parse(value);
@@ -54,10 +45,7 @@ export function toParts(ms) {
   };
 }
 
-/**
- * Picker fields → timestamp. Day is clamped to the month's length (e.g. 31 Feb → 28/29 Feb);
- * returns { ms, error } where error is set if the year is outside 1…9999.
- */
+/** Picker fields → { ms, error }. The day is clamped to the month; error if the year is outside 1…9999. */
 export function fromParts({ eraYear, era, month, day, hours, minutes }) {
   if (!Number.isInteger(eraYear) || eraYear < 1 || eraYear > MAX_ERA_YEAR) {
     return { ms: null, error: `Year must be 1–${MAX_ERA_YEAR} (AD or BC)` };

@@ -1,6 +1,4 @@
-// Lunarium's site list. Coordinates are approximate; some were nudged onto nearby lit high
-// ground so they sit on the 5 m terrain tiles (see scripts/fetch-site-terrain.mjs).
-// Also used to name the backend's sites (data/siteCatalog.js).
+// Lunarium's sites. Some were nudged onto nearby lit, gentle ground inside the 5 m terrain tiles.
 
 export const MOCK_SITES = [
   { id: 'shackleton-rim', name: 'Shackleton Rim', lat: -89.8554, lon: -150.9832, category: 'artemis-candidate', agency: 'NASA', notes: 'Near-continuous illumination on the crater rim; PSR ice nearby.' },

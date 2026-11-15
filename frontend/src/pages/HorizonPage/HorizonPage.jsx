@@ -1,6 +1,3 @@
-// Lunarium: first-person view standing at a landing site. Design notes:
-// docs/superpowers/specs/2026-11-14-horizon-view-design.md
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HorizonScene, deviceQuaternion } from '../../scene/HorizonScene.js';
 import { getHorizonTerrain, getLunariumSite } from '../../data/api.js';
@@ -73,7 +70,6 @@ export default function HorizonPage() {
     playRef.current = { playing, speed };
   }, [playing, speed]);
 
-  // Scene lifecycle
   useEffect(() => {
     const scene = new HorizonScene(hostRef.current, { mobile: isMobile() });
     sceneRef.current = scene;
@@ -189,7 +185,6 @@ export default function HorizonPage() {
     sceneRef.current?.setFollow(next);
   }, []);
 
-  // Look controls: drag / pinch / wheel
   useEffect(() => {
     const el = hostRef.current;
     const pts = new Map();
@@ -232,7 +227,6 @@ export default function HorizonPage() {
     };
   }, []);
 
-  // Phone motion sensors
   const motionCleanup = useRef(null);
   const toggleMotion = useCallback(async () => {
     const scene = sceneRef.current;

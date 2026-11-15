@@ -1,5 +1,4 @@
-// Sun/Earth timeline for Lunarium, checked against the first-person terrain horizon so the
-// drawn ridge, the labels and the time bar agree.
+// Sun/Earth timeline checked against the first-person terrain horizon, so ridge, labels and time bar agree.
 
 import { horizonAt } from '../../data/horizonTerrain.js';
 

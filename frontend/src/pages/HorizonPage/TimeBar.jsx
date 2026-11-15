@@ -5,7 +5,6 @@ const fmtUtc = (ms) => {
   return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })} · ${d.toISOString().slice(11, 16)} UTC`;
 };
 
-/** Sun/Earth visibility bar with play, speed and scrub. */
 export default function TimeBar({ timeline, now, sunRuns, earthRuns, playing, onPlay, speeds, speed, onSpeed, onScrub, onLanding, onNextSun, onNextEarth, windowLabel }) {
   const trackRef = useRef(null);
   const span = timeline.end - timeline.start;

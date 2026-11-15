@@ -1,18 +1,4 @@
-// First-person terrain + terrain horizon for a site ("HorizonTerrain", see SCHEMA.md).
-//
-// Three nested square layers on a local east/north tangent plane centred on the site
-// (row 0 = north, col 0 = west, heights in metres relative to the 1737.4 km sphere):
-//   near  2 km   – NASA PGDA 5 m LOLA where available (5 m), else the global grid (10 m)
-//   mid  16 km   – PGDA 5 m LOLA resampled to 25 m (holes filled from the global grid, edges
-//                  blended into it), else the global grid (50 m)
-//   far 300 km   – global LOLA grid (1 km)
-// The horizon profile is ray-marched over exactly these layers. It is the ONE horizon used by
-// both the first-person view and the dashboard metrics, so they always agree.
-//
-// Curated sites ship as precomputed "site packs" (scripts/fetch-site-terrain.mjs →
-// public/terrain/<siteId>/): meta.json (incl. the horizon) + binary layers. A pack is ~1–2 MB,
-// so a phone never downloads the 33 MB global grid just to stand at a curated site.
-// This module is pure (no app config) so the build script can use it in Node.
+// Pure (no app config) so scripts/fetch-site-terrain.mjs can use it. Format: SCHEMA.md → HorizonTerrain.
 
 import { clampLat, MOON_RADIUS_KM } from '../utils/coords.js';
 
@@ -75,13 +61,7 @@ export function horizonAt(horizon, az) {
   return b[i] * (1 - f) + b[(i + 1) % b.length] * f;
 }
 
-/**
- * Build the layers + horizon for a site.
- * @param {object} p
- * @param {{id:string, lat:number, lon:number}} p.site
- * @param {(lat, lon, {sizeKm, n}) => TerrainPatch | Promise<TerrainPatch>} p.coarsePatch global-grid sampler
- * @param {{near: Float32Array, mid: Float32Array, source: string} | null} p.fine 5 m layers (2 km@401², 16 km@641²; NaN = no data)
- */
+/** Layers + horizon for a site. `fine` holds the optional 5 m LOLA layers (NaN = no data). */
 export async function assembleHorizonTerrain({ site, coarsePatch, fine = null }) {
   const lat = clampLat(site.lat);
   const nMid = fine ? 641 : 321;

@@ -1,12 +1,5 @@
-// Mock Sun/Earth model: a simplified geometric model run in the browser. The backend does not
-// provide Sun/Earth positions yet, so the panel's Sun & Earth section and Lunarium use this.
-//   • Sun: subsolar longitude from the synodic phase (reference new moon 2000-01-06 18:14 UTC),
-//     subsolar latitude ±1.54° over the draconic year.
-//   • Earth: sub-Earth point wobbles with optical libration (±7.9° lon, ±6.7° lat).
-//   • Horizon: normally passed in (api.getSiteHorizon → the same 5 m/global LOLA horizon Lunarium
-//     renders, 0.5° steps); falls back to ray-marching the global grid here (2° steps) incl. curvature.
-//   • Power (shown in Lunarium only): sun-tracking panel, 2 m² at 30%, scaled by visible Sun disk.
-// Not ephemeris-grade. Output shape documented in data/SCHEMA.md.
+// Simplified Sun/Earth model for Lunarium, not ephemeris-grade. Sun: synodic phase from the
+// 2000-01-06 18:14 UTC new moon, ±1.54° latitude. Earth: optical libration (±7.9° lon, ±6.7° lat).
 
 import { MOON_RADIUS_KM, latLonToVec, enuBasis, elevAz, destination, clampLat } from '../../utils/coords.js';
 
@@ -72,12 +65,6 @@ const horizonAt = ({ stepDeg, elevation: bins }, az) => {
 /** Fraction of a disk of angular radius r visible above a horizon (linear approximation). */
 const visibleFraction = (elevAboveHorizon, r) => Math.max(0, Math.min(1, (elevAboveHorizon + r) / (2 * r)));
 
-/**
- * @param {object|null} grid  from loadElevation(); only needed when no `horizon` is given
- * @param {{lat:number, lon:number}} site
- * @param {Date} date    selected time
- * @param {{daysBefore?:number, days?:number, stepH?:number, horizon?:{stepDeg:number, elevation:number[]}}} opts
- */
 export function computeSiteMetrics(grid, site, date, { daysBefore = 3, days = 30, stepH = 1, horizon: given } = {}) {
   const lat = clampLat(site.lat);
   const basis = enuBasis(lat, site.lon);
@@ -111,7 +98,6 @@ export function computeSiteMetrics(grid, site, date, { daysBefore = 3, days = 30
   const now = series[i0];
   const future = series.slice(i0);
 
-  // Time until a condition flips (sunset/sunrise, Earthset/Earthrise) within the window.
   // Hours until the next time `isUp` changes to `toUp` (rise if true, set if false); null if not in window.
   const timeUntilEdge = (isUp, toUp) => {
     for (let k = 1; k < future.length; k++) {
