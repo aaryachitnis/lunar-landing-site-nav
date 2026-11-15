@@ -27,7 +27,7 @@ tested on synthetic terrain and a made-up Earth track with known answers.
 The Horizons query and the NASA terrain download have NOT been tested here
 (my sandbox cannot reach them), so check them on your first run.
 """
-import csv
+import json
 import math
 from datetime import datetime
 
@@ -98,11 +98,6 @@ def check_window(start_dt, end_dt, step):
 
 def jd_to_text(jd):
     return Time(jd, format="jd", scale="utc").strftime("%d/%m/%Y %H:%M")
-
-
-def compass_name(az_deg):
-    names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
-    return names[int(((az_deg % 360.0) + 22.5) // 45) % 8]
 
 
 def in_az_range(az_deg, lo, hi):
@@ -286,71 +281,6 @@ def analyse_site(dem, lat, lon, start_dt, end_dt, step, max_range_km,
     }
 
 
-# ----------------------------------------------------------------------
-# Reporting
-# ----------------------------------------------------------------------
-def print_report(lat, lon, start_txt, end_txt, res, threshold_deg):
-    mh = res["mission_hours"]
-    scale = 24.0 / mh        # turns mission totals into hours per 24 h window
-    print("=" * 72)
-    print(f"Site: lat {lat}, lon {lon}")
-    print(f"Mission: {start_txt} to {end_txt} UTC ({mh:.1f} h)")
-
-    print(f"\nMountains found in LOLA terrain (ground rising above "
-          f"{threshold_deg:g} deg):")
-    if not res["sectors"]:
-        print(f"   none; the highest skyline is {res['highest_skyline_deg']:.2f} deg "
-              f"(flat horizon in every direction)")
-    for i, s in enumerate(res["sectors"], 1):
-        where = ("all directions" if s["all_around"] else
-                 f"compass {s['az_from']:.0f} to {s['az_to']:.0f} deg "
-                 f"({compass_name(s['az_from'])} to {compass_name(s['az_to'])})")
-        print(f"   Sector {i}: {where}")
-        print(f"      steepest angle {s['peak_deg']:.2f} deg at "
-              f"{s['peak_az']:.0f} deg ({compass_name(s['peak_az'])}), average "
-              f"{s['mean_deg']:.2f} deg")
-        print(f"      crest {s['crest_height_m']:+.0f} m relative to the site, "
-              f"{s['crest_distance_km']:.1f} km away")
-        print(f"      per 24 h: Earth in this sector's directions for "
-              f"{s['earth_in_sector_h'] * scale:.1f} h, hidden by it for "
-              f"{s['earth_hidden_by_sector_h'] * scale:.1f} h")
-
-    print(f"\nEarth during the mission:")
-    print(f"   at start: {res['earth_el_start']:.2f} deg high, direction "
-          f"{res['earth_az_start']:.0f} deg ({compass_name(res['earth_az_start'])})")
-    print(f"   at end:   {res['earth_el_end']:.2f} deg high, direction "
-          f"{res['earth_az_end']:.0f} deg ({compass_name(res['earth_az_end'])})")
-    print(f"   height ranges from {res['earth_el_min']:.2f} to "
-          f"{res['earth_el_max']:.2f} deg")
-
-    print(f"\nRESULT (average over the mission, per 24 h window):")
-    print(f"   Earth visible for {res['visible_hours'] * scale:.2f} h of 24 h "
-          f"({100 * res['visible_hours'] / mh:.0f}%)")
-    print(f"   fully visible (whole disc): {res['fully_visible_hours'] * scale:.2f} h")
-    print(f"   above the horizon but hidden by mountains: "
-          f"{res['hidden_by_mountains_hours'] * scale:.2f} h")
-    print(f"   below the horizon regardless of mountains: "
-          f"{res['below_horizon_hours'] * scale:.2f} h")
-    print(f"   longest unbroken outage during the mission: "
-          f"{res['longest_outage_hours']:.1f} h")
-    if mh < 24.0:
-        print(f"   (the mission is shorter than 24 h, so these figures are "
-              f"scaled up from {mh:.1f} h)")
-    if res["windows"]:
-        print("   visible windows during the mission (UTC):")
-        for s, e, h in res["windows"]:
-            print(f"      {jd_to_text(s)} to {jd_to_text(e)}  ({h:.1f} h)")
-    else:
-        print("   Earth is never visible in this window.")
-
-
-def save_windows_csv(rows, path="earth_visible_windows.csv"):
-    with open(path, "w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(["site", "lat", "lon", "start_utc", "end_utc", "hours"])
-        w.writerows(rows)
-
-
 if __name__ == "__main__":
     start_dt, end_dt = parse_datetime(START), parse_datetime(END)
     check_window(start_dt, end_dt, STEP)
@@ -358,20 +288,25 @@ if __name__ == "__main__":
     print(f"Terrain: {dem.meta['dataset']}, {dem.pixel_km * 1000:.0f} m per "
           f"pixel at the equator")
 
-    csv_rows = []
+    results = []
     for i, (lat, lon) in enumerate(SITES):
+        row = {"site": i, "lat": lat, "lon": lon}
         try:
             res = analyse_site(dem, lat, lon, start_dt, end_dt, STEP,
                                MAX_RANGE_KM, MOUNTAIN_THRESHOLD_DEG,
                                MIN_ELEVATION_DEG, COUNT_PARTIAL_AS_VISIBLE,
                                FINE_STEP_MIN)
         except Exception as exc:   # one bad site never stops the rest
-            print("=" * 72)
-            print(f"Site {i} ({lat}, {lon}): {exc}")
-            continue
-        print_report(lat, lon, START, END, res, MOUNTAIN_THRESHOLD_DEG)
-        for s, e, h in res["windows"]:
-            csv_rows.append([i, lat, lon, jd_to_text(s), jd_to_text(e),
-                             round(h, 2)])
-    save_windows_csv(csv_rows)
-    print("\nSaved earth_visible_windows.csv")
+            row["error"] = str(exc)
+        else:
+            row.update(res)
+            row["windows"] = [
+                {
+                    "start_utc": jd_to_text(start_jd),
+                    "end_utc": jd_to_text(end_jd),
+                    "hours": float(hours),
+                }
+                for start_jd, end_jd, hours in res["windows"]
+            ]
+        results.append(row)
+    print(json.dumps(results, indent=2))

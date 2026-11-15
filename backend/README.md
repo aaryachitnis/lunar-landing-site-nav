@@ -30,7 +30,7 @@ The frontend's dev server forwards `/api/*` here, so local development needs no 
 
 Communication dates use ISO 8601 UTC. Optional parameters select terrain resolution (`terrain_ppd=4`, `16`, or `64`), skyline range, mountain threshold, minimum Earth elevation, whether partial Earth-disc visibility counts, and the interpolation step. Terrain endpoints use the default LOLA elevation grid (16 pixels/degree) and a 10 km analysis radius. The first request downloads and converts the NASA LOLA elevation grid if it is not already cached under `data/terrain` (or `LOLA_DATA_DIR`). JPL Horizons and terrain-data failures return explicit `502`/`503` errors.
 
-To print the surface-roughness dataset and per-site metrics in the terminal instead of calling the API, run this from `backend/`:
+To print the surface-roughness dataset and per-site results as a JSON list in the terminal instead of calling the API, run this from `backend/`:
 
 ```powershell
 python -m services.surface_roughness

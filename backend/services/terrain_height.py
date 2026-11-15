@@ -42,7 +42,6 @@ NOT TESTED against the live NASA server (my sandbox cannot reach it). The
 conversion, loading and sampling were tested on synthetic files.
 """
 import argparse
-import csv
 import json
 import os
 import sys
@@ -333,17 +332,6 @@ def terrain_stats(grid, sites, radius_km=TERRAIN_RADIUS_KM):
     return results
  
  
-def save_terrain_csv(results, path="site_terrain_stats.csv"):
-    first = ["site", "lat", "lon", "radius_km", "site_height_m",
-             "max_height_m", "min_height_m", "max_above_site_m",
-             "min_below_site_m", "relief_m", "pixels_used", "error"]
-    keys = [k for k in first if any(k in r for r in results)]
-    with open(path, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=keys)
-        w.writeheader()
-        w.writerows(results)
- 
- 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(
         description="Build the LOLA elevation files and report the terrain "
@@ -361,16 +349,5 @@ if __name__ == "__main__":
           f"{grid.meta['resolution_m_at_equator']} m/pixel at the equator")
  
     stats = terrain_stats(grid, [site[2] for site in SITES], args.radius_km)
-    print(f"\nTerrain within {args.radius_km:g} km of each site "
-          f"(metres above the 1737.4 km reference sphere):")
-    for r in stats:
-        if "error" in r:
-            print(f"  site {r['site']} ({r['lat']}, {r['lon']}): {r['error']}")
-        else:
-            print(f"  site {r['site']} ({r['lat']}, {r['lon']}): "
-                  f"site {r['site_height_m']:.0f} | "
-                  f"highest {r['max_height_m']:.0f} ({r['max_above_site_m']:+.0f} vs site) | "
-                  f"lowest {r['min_height_m']:.0f} ({r['min_below_site_m']:+.0f} vs site)")
-    save_terrain_csv(stats)
-    print("Saved site_terrain_stats.csv")
+    print(json.dumps(stats, indent=2))
 

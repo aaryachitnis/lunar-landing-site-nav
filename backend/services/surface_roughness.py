@@ -1,5 +1,6 @@
 """Broad-scale slope and RMS roughness calculations from LOLA elevation data."""
 
+import json
 import math
 import sys
 from pathlib import Path
@@ -124,21 +125,15 @@ def analyse_all_sites() -> dict:
 
 
 def print_report(report: dict) -> None:
-    """Print the source and three requested metrics for each landing site."""
+    """Print source metadata followed by the per-site results as a JSON list."""
     print(f"Dataset: {report['data_source']}")
     print(f"Source: {report['source_url']}")
     print(
         f"Resolution: {report['resolution_m_at_equator']:g} m/pixel at the "
         f"equator; analysis radius: {report['analysis_radius_km']:g} km"
     )
-    for site in report["sites"]:
-        print(
-            f"{site['site_name']} ({site['site_id']}): "
-            f"mean slope {site['mean_slope_deg']:.2f} deg | "
-            f"max slope {site['max_slope_deg']:.2f} deg | "
-            f"RMS surface roughness "
-            f"{site['rms_surface_roughness_m']:.1f} m"
-        )
+    print("Sites:")
+    print(json.dumps(report["sites"], indent=2))
 
 
 if __name__ == "__main__":

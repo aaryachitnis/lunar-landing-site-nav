@@ -1,3 +1,4 @@
+import json
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -103,9 +104,11 @@ class SurfaceRoughnessTests(unittest.TestCase):
 
         self.assertIn("Synthetic LOLA grid", output.getvalue())
         self.assertIn("https://example.test/ldem_16.tif", output.getvalue())
-        self.assertIn("mean slope 1.25 deg", output.getvalue())
-        self.assertIn("max slope 3.50 deg", output.getvalue())
-        self.assertIn("RMS surface roughness 2.0 m", output.getvalue())
+        site_list = json.loads(output.getvalue().split("Sites:\n", maxsplit=1)[1])
+        self.assertEqual(len(site_list), 1)
+        self.assertEqual(site_list[0]["mean_slope_deg"], 1.25)
+        self.assertEqual(site_list[0]["max_slope_deg"], 3.5)
+        self.assertEqual(site_list[0]["rms_surface_roughness_m"], 2.0)
 
 
 if __name__ == "__main__":
