@@ -2,6 +2,6 @@
 
 from data import SITES
 
-Sites = [list(coordinates) for coordinates in SITES]
+Sites = [list(site[2]) for site in SITES]
 
 __all__ = ["Sites"]

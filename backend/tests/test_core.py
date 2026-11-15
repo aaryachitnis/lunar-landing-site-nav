@@ -16,6 +16,8 @@ class CoreModelTests(unittest.TestCase):
     def test_site_summary_validates_coordinate_ranges(self) -> None:
         site = SiteSummary(id="site-1", lat=-90, lon=180)
         self.assertEqual((site.lat, site.lon), (-90, 180))
+        self.assertEqual(site.loc, (-90, 180))
+        self.assertEqual(site.name, "")
 
         with self.assertRaises(ValidationError):
             SiteSummary(id="site-1", lat=-91, lon=0)

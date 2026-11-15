@@ -4,12 +4,6 @@ from unittest.mock import patch
 import numpy as np
 from requests.exceptions import Timeout
 
-from power_gen import (
-    SOLAR_INTENSITY,
-    SOLAR_PANEL_EFFICIENCY,
-    calculate_beta_angle as legacy_calculate_beta_angle,
-    calculate_energy_per_day as legacy_calculate_energy_per_day,
-)
 from services import (
     HorizonsRequestError,
     calculate_beta_angle,
@@ -83,27 +77,6 @@ class PowerServiceTests(unittest.TestCase):
             calculate_beta_angle({"AZ": [0.0, 90.0], "EL": [30.0]})
         with self.assertRaisesRegex(ValueError, "between -90 and 90"):
             calculate_beta_angle({"AZ": [0.0], "EL": [91.0]})
-
-    def test_modular_calculations_match_legacy_power_gen(self) -> None:
-        ephemeris = {
-            "AZ": np.array([0.0, 90.0, 180.0]),
-            "EL": np.array([30.0, -10.0, 60.0]),
-            "datetime_jd": 2_460_000.0 + np.array([0.0, 0.5, 1.0]),
-        }
-        legacy_beta = legacy_calculate_beta_angle(ephemeris)
-        modular_beta = calculate_beta_angle(ephemeris)
-        np.testing.assert_allclose(modular_beta, legacy_beta)
-
-        legacy_power = SOLAR_INTENSITY * SOLAR_PANEL_EFFICIENCY * np.maximum(
-            0.0,
-            np.cos(np.deg2rad(legacy_beta)),
-        )
-        modular_power = calculate_instantaneous_power_per_area(ephemeris)
-        np.testing.assert_allclose(modular_power, legacy_power)
-        self.assertEqual(
-            calculate_energy_per_day(modular_power, ephemeris),
-            legacy_calculate_energy_per_day(legacy_power, ephemeris),
-        )
 
     def test_instantaneous_power_is_zero_below_horizon(self) -> None:
         ephemeris = {

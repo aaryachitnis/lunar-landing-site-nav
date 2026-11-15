@@ -23,7 +23,7 @@ The frontend's dev server forwards `/api/*` here, so local development needs no 
 | Method and path | Returns |
 |---|---|
 | `GET /health` | Service status |
-| `GET /sites` | All sites as `{ id, lat, lon }`, in a stable order |
+| `GET /sites` | All sites with `id`, `name`, `loc`, `desc`, and `agency`; also includes `lat` and `lon` for compatibility |
 | `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour` | Solar power for the time range |
 
 `start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. A 30-day request takes several seconds.
@@ -43,7 +43,7 @@ Errors: `400` bad dates or reversed range, `404` unknown site, `502` bad data fr
 
 ## Sites
 
-The catalog is [`data/sites.py`](data/sites.py). Ids are assigned by position (`site-1`, `site-2`, …), so add new sites at the end. Coordinates are planetocentric degrees, east-positive longitude.
+The catalog is [`data/sites.py`](data/sites.py). Canonical IDs are stored with each site (for example, `orig1`); the previous position-based IDs (`site-1`, `site-2`, …) remain accepted for metrics requests. `loc` is `[latitude, longitude]` in planetocentric degrees, with east-positive longitude. Metrics responses include the same site metadata.
 
 ## Configuration
 

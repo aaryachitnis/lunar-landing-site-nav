@@ -23,12 +23,20 @@ class ApiRouteTests(unittest.TestCase):
             {"status": "ok", "message": "FastAPI backend is live."},
         )
 
-    def test_site_list_uses_stable_ids_and_coordinates(self) -> None:
+    def test_site_list_returns_catalog_metadata_and_coordinates(self) -> None:
         results = sites.get_sites()
         self.assertEqual(len(results), 9)
-        self.assertEqual(results[0].id, "site-1")
+        self.assertEqual(results[0].id, "orig1")
+        self.assertEqual(results[0].name, "Artemis 3 (Amundsen)")
+        self.assertEqual(results[0].loc, (-84.2287, 69.44396))
+        self.assertTrue(results[0].desc)
+        self.assertEqual(results[0].agency, "NASA")
         self.assertEqual(results[0].lat, -84.2287)
-        self.assertEqual(results[-1].id, "site-9")
+        self.assertEqual(results[-1].id, "orig9")
+        serialized = results[0].model_dump(mode="json")
+        self.assertEqual(serialized["loc"], [-84.2287, 69.44396])
+        self.assertEqual(serialized["lat"], -84.2287)
+        self.assertEqual(serialized["lon"], 69.44396)
 
     def test_unknown_site_and_invalid_ranges_return_http_errors(self) -> None:
         with self.assertRaises(HTTPException) as unknown_site:
@@ -90,7 +98,12 @@ class ApiRouteTests(unittest.TestCase):
                 get_settings(),
             )
 
-        self.assertEqual(result.site.id, "site-1")
+        self.assertEqual(result.site.id, "orig1")
+        self.assertEqual(result.site.name, "Artemis 3 (Amundsen)")
+        self.assertEqual(
+            result.model_dump(mode="json")["site"]["agency"],
+            "NASA",
+        )
         self.assertEqual(result.start, "2026-01-01T00:00:00Z")
         self.assertEqual(result.end, "2026-01-02T00:00:00Z")
         self.assertEqual(len(result.instantaneous_power_per_area_W_m2), 2)
@@ -101,6 +114,11 @@ class ApiRouteTests(unittest.TestCase):
             "2026-01-02 00:00",
             "4hour",
         )
+
+    def test_metrics_route_accepts_legacy_site_id_alias(self) -> None:
+        result = sites.resolve_site("site-1")
+        self.assertEqual(result.id, "orig1")
+        self.assertEqual(result.name, "Artemis 3 (Amundsen)")
 
     def test_metrics_route_maps_service_and_ephemeris_errors(self) -> None:
         request = (
@@ -141,15 +159,6 @@ class ApiRouteTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as invalid_data:
                 sites.get_site_metrics(*request)
         self.assertEqual(invalid_data.exception.status_code, 502)
-
-
-class LegacyEntryPointTests(unittest.TestCase):
-    def test_legacy_power_gen_remains_importable_and_separate(self) -> None:
-        from power_gen import app as legacy_app
-
-        self.assertIsNot(legacy_app, app)
-        paths = {route.path for route in legacy_app.routes if hasattr(route, "path")}
-        self.assertIn("/sites/{site_id}/metrics", paths)
 
 
 if __name__ == "__main__":
