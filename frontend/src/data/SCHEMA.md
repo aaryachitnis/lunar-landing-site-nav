@@ -16,7 +16,7 @@ the astronomical horizon unless the field says `AboveHorizon` (relative to the l
   "name": "Shackleton Rim",
   "lat": -89.85,
   "lon": 160.0,
-  "category": "artemis-candidate | clps | international | apollo | custom",
+  "category": "artemis-candidate | clps | international | apollo",
   "agency": "NASA",
   "notes": "free text",
   "mock": true

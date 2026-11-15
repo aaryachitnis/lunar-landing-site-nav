@@ -2,7 +2,7 @@
 // Today everything is mocked locally; when the Python backend is ready, swap each function
 // body for a fetch() to its endpoint/JSON file — return shapes are documented in SCHEMA.md.
 
-import { MOCK_SITES, parseCustomSiteId } from './mock/sites.js';
+import { MOCK_SITES } from './mock/sites.js';
 import { computeSiteMetrics } from './mock/metrics.js';
 import { loadElevation } from './elevation.js';
 import { destination, clampLat } from '../utils/coords.js';
@@ -15,10 +15,10 @@ export async function getSites() {
   return MOCK_SITES;
 }
 
-/** Resolve a site id (including custom_<lat>_<lon> ids) to a site object. */
+/** Resolve a site id to a site object (null if unknown). */
 export async function getSite(id) {
   const sites = await getSites();
-  return sites.find((s) => s.id === id) ?? parseCustomSiteId(id);
+  return sites.find((s) => s.id === id) ?? null;
 }
 
 /**

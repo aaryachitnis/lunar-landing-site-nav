@@ -1,17 +1,14 @@
 import { useMemo, useState } from 'react';
-import { SITE_CATEGORIES, makeCustomSite } from '../../data/mock/sites.js';
+import { SITE_CATEGORIES } from '../../data/mock/sites.js';
 import { formatLat, formatLon } from '../../utils/format.js';
 import './SiteList.css';
 
 /**
- * Left-hand list of landing sites grouped by category, with search and custom coordinates.
- * @param {{ sites: object[], selectedId: string|null, onSelect: (id) => void, onAddCustom: (site) => void, loading: boolean }} props
+ * Left-hand list of landing sites grouped by category, with search.
+ * @param {{ sites: object[], selectedId: string|null, onSelect: (id) => void, loading: boolean }} props
  */
-export default function SiteList({ sites, selectedId, onSelect, onAddCustom, loading, collapsed, onToggle }) {
+export default function SiteList({ sites, selectedId, onSelect, loading, collapsed, onToggle }) {
   const [query, setQuery] = useState('');
-  const [lat, setLat] = useState('');
-  const [lon, setLon] = useState('');
-  const [error, setError] = useState(null);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -20,18 +17,6 @@ export default function SiteList({ sites, selectedId, onSelect, onAddCustom, loa
       .map(([key, cat]) => ({ key, ...cat, sites: filtered.filter((s) => s.category === key) }))
       .filter((g) => g.sites.length);
   }, [sites, query]);
-
-  const submitCustom = (e) => {
-    e.preventDefault();
-    const la = Number(lat);
-    const lo = Number(lon);
-    if (lat === '' || lon === '' || !Number.isFinite(la) || !Number.isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) {
-      setError('Latitude −90…90, longitude −180…180');
-      return;
-    }
-    setError(null);
-    onAddCustom(makeCustomSite(la, lo));
-  };
 
   return (
     <aside className={`site-list${collapsed ? ' collapsed' : ''}`} aria-label="Landing sites">
@@ -75,21 +60,6 @@ export default function SiteList({ sites, selectedId, onSelect, onAddCustom, loa
               </section>
             ))}
           </div>
-          <form className="custom-site" onSubmit={submitCustom}>
-            <h3>Custom coordinates</h3>
-            <div className="custom-site-fields">
-              <label>
-                <span>Lat °</span>
-                <input inputMode="decimal" placeholder="-89.5" value={lat} onChange={(e) => setLat(e.target.value)} />
-              </label>
-              <label>
-                <span>Lon °E</span>
-                <input inputMode="decimal" placeholder="45" value={lon} onChange={(e) => setLon(e.target.value)} />
-              </label>
-              <button type="submit">Go</button>
-            </div>
-            {error && <p className="field-error">{error}</p>}
-          </form>
         </>
       )}
     </aside>

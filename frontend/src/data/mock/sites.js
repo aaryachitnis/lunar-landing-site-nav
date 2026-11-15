@@ -6,7 +6,6 @@ export const SITE_CATEGORIES = {
   clps: { label: 'CLPS / commercial', color: 'var(--cat-2)' },
   international: { label: 'International', color: 'var(--cat-3)' },
   apollo: { label: 'Apollo (historical)', color: 'var(--cat-4)' },
-  custom: { label: 'Custom', color: 'var(--cat-5)' },
 };
 
 export const MOCK_SITES = [
@@ -32,23 +31,3 @@ export const MOCK_SITES = [
   { id: 'apollo-15', name: 'Apollo 15', lat: 26.132, lon: 3.634, category: 'apollo', agency: 'NASA', notes: 'Hadley–Apennine (1971).' },
   { id: 'apollo-17', name: 'Apollo 17', lat: 20.191, lon: 30.772, category: 'apollo', agency: 'NASA', notes: 'Taurus–Littrow (1972).' },
 ].map((s) => ({ ...s, mock: true }));
-
-export function makeCustomSite(lat, lon) {
-  const la = Number(lat.toFixed(4));
-  const lo = Number(lon.toFixed(4));
-  return {
-    id: `custom_${la}_${lo}`,
-    name: 'Custom site',
-    lat: la,
-    lon: lo,
-    category: 'custom',
-    agency: '—',
-    notes: 'User-entered coordinates.',
-    mock: true,
-  };
-}
-
-export function parseCustomSiteId(id) {
-  const m = /^custom_(-?[\d.]+)_(-?[\d.]+)$/.exec(id || '');
-  return m ? makeCustomSite(Number(m[1]), Number(m[2])) : null;
-}

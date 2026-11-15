@@ -1,11 +1,15 @@
-.time-picker { margin-bottom: 8px; }
+.time-picker { margin-bottom: 10px; }
 .time-picker-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .time-picker-fields select,
 .time-picker-fields input {
-  padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); font-size: 12px;
+  padding: 4px 6px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-2);
+  font-family: var(--mono); font-size: 12px;
 }
+.time-picker-fields select:focus,
+.time-picker-fields input:focus { outline: none; border-color: var(--accent); box-shadow: var(--glow); }
+.time-picker-fields input[type='time']::-webkit-calendar-picker-indicator { filter: invert(0.7) sepia(1) hue-rotate(170deg) saturate(4); }
 .time-picker-year { width: 4.5em; }
 .time-picker-year[aria-invalid='true'] { border-color: var(--critical); }
-.time-picker-fields .muted { font-size: 12px; }
-.time-picker-note { margin: 4px 0 0; font-size: 11px; }
+.time-picker-fields .muted { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; }
+.time-picker-note { margin: 4px 0 0; font-family: var(--mono); font-size: 10.5px; }
 .time-picker .field-error { margin: 4px 0 0; }
