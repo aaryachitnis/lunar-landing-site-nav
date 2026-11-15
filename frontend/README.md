@@ -38,7 +38,7 @@ Run `npm run dev:phone` and open the `https://` Network URL on a phone on the sa
 - **Let there be light:** lights the globe's night side. Visual only, off by default, remembered per browser.
 - **Site list** (left): sites from the backend, grouped by category, with search.
 - **Site panel** (right):
-  1. Name, category and a link to stand at the site in Lunarium.
+  1. Mission, region, agency and category, an ⓘ button showing the site description (hover, focus or tap), and a link to stand at the site in Lunarium.
   2. Location: coordinates, elevation, slope and roughness.
   3. Bird's-eye 3D terrain, 80 × 80 km.
   4. Time picker.
@@ -62,7 +62,7 @@ Tabs come from `src/routes.jsx`. Switching tabs keeps `?site=` and `?t=`. On pho
 
 | URL param | Meaning |
 |---|---|
-| `site` | Site id: a backend id such as `site-3`, or a Lunarium id such as `shackleton-rim` |
+| `site` | Site id: a backend id such as `orig3` (old `site-3` links still work), or a Lunarium id such as `shackleton-rim` |
 | `t` | Selected time, ISO 8601 UTC. Defaults to the current hour. |
 
 ## Architecture
@@ -94,7 +94,7 @@ Rules:
 
 | Function | Returns | Source |
 |---|---|---|
-| `getSites()` | `Site[]` | Backend `GET /sites`, named by `siteCatalog.js` |
+| `getSites()` | `Site[]` | Backend `GET /sites`, reshaped by `siteCatalog.js` |
 | `getSitePower(site, t)` | `SitePower` | Backend `GET /sites/{id}/metrics` |
 | `getSkyModel(site, t)` | `SkyModel` | Mock model in `mock/metrics.js` |
 | `getLunariumSites()`, `getLunariumSite(id)` | `Site[]`, `Site` | `mock/sites.js`; `getLunariumSite` also accepts backend ids |
@@ -155,8 +155,8 @@ npm run build      # must pass
 npm run preview    # with the backend running, then open:
 ```
 
-- `/?site=site-3&t=2026-11-14T12:00:00.000Z`: Apollo 11. Live power loads after a few seconds; the Sun is below the horizon.
-- `/?site=site-8`: an unnamed south-pole site, shown as "Site 8".
+- `/?site=orig3&t=2026-11-14T12:00:00.000Z`: Apollo 11. Live power loads after a few seconds; the Sun is below the horizon.
+- `/?site=orig8`: Faustini Rim A, a south-pole site with no region in its name.
 - `/lunarium?site=shackleton-rim`: first-person view on 5 m terrain.
 
 Headless screenshots: `chrome --headless=new --use-angle=swiftshader --enable-unsafe-swiftshader --virtual-time-budget=30000 --screenshot=out.png <url>`.
