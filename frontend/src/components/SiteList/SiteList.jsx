@@ -1,13 +1,10 @@
 import { useMemo, useState } from 'react';
-import { SITE_CATEGORIES } from '../../data/mock/sites.js';
+import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
 import { formatLat, formatLon } from '../../utils/format.js';
 import './SiteList.css';
 
-/**
- * Left-hand list of landing sites grouped by category, with search.
- * @param {{ sites: object[], selectedId: string|null, onSelect: (id) => void, loading: boolean }} props
- */
-export default function SiteList({ sites, selectedId, onSelect, loading, collapsed, onToggle }) {
+/** Left-hand list of landing sites grouped by category, with search. */
+export default function SiteList({ sites, selectedId, onSelect, loading, error, collapsed, onToggle }) {
   const [query, setQuery] = useState('');
 
   const groups = useMemo(() => {
@@ -27,7 +24,6 @@ export default function SiteList({ sites, selectedId, onSelect, loading, collaps
         <>
           <div className="site-list-head">
             <h2>Landing sites</h2>
-            <span className="tag-mock" title="Placeholder sites until the backend provides real data">Mock</span>
           </div>
           <input
             className="site-search"
@@ -39,6 +35,7 @@ export default function SiteList({ sites, selectedId, onSelect, loading, collaps
           />
           <div className="site-groups">
             {loading && <p className="muted">Loading sites…</p>}
+            {error && <p className="field-error">{String(error.message ?? error)}</p>}
             {groups.map((g) => (
               <section key={g.key}>
                 <h3>

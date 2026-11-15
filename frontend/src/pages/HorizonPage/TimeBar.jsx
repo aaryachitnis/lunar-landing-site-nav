@@ -5,7 +5,7 @@ const fmtUtc = (ms) => {
   return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })} · ${d.toISOString().slice(11, 16)} UTC`;
 };
 
-/** SPIKE: two-row Sun/Earth visibility bar with play, speed and scrub. */
+/** Sun/Earth visibility bar with play, speed and scrub. */
 export default function TimeBar({ timeline, now, sunRuns, earthRuns, playing, onPlay, speeds, speed, onSpeed, onScrub, onLanding, onNextSun, onNextEarth, windowLabel }) {
   const trackRef = useRef(null);
   const span = timeline.end - timeline.start;
@@ -32,7 +32,7 @@ export default function TimeBar({ timeline, now, sunRuns, earthRuns, playing, on
             </button>
           ))}
           <button className="hz-btn" onClick={onLanding} title="Back to landing time">
-            ⟲ Landing
+            ⟲<span className="hz-long"> Landing</span>
           </button>
           <button className="hz-btn" onClick={onNextSun} title="Jump to just before the next sunset/sunrise">
             ⏭ ☀
@@ -42,7 +42,7 @@ export default function TimeBar({ timeline, now, sunRuns, earthRuns, playing, on
           </button>
         </div>
         <div className="hz-tb-time tabular">
-          <b>{fmtUtc(now)}</b> <span className="muted">({relLabel} from landing)</span>
+          <b>{fmtUtc(now)}</b> <span className="muted">({relLabel}<span className="hz-long"> from landing</span>)</span>
         </div>
         <div className="muted hz-tb-window">{windowLabel}</div>
       </div>

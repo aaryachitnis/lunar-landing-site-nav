@@ -7,7 +7,6 @@ const pad = (n) => String(n).padStart(2, '0');
 /**
  * UTC date/time picker covering 9999 BC … 9999 AD. Replaces <input type="datetime-local">,
  * which can't represent BC years, accepts years up to 275760 and works in local time.
- * @param {{ value: string, onChange: (iso: string) => void }} props
  */
 export default function TimePicker({ value, onChange }) {
   const parts = toParts(Date.parse(value));

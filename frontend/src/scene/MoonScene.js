@@ -60,7 +60,7 @@ export class MoonScene {
       controls.rotateSpeed = THREE.MathUtils.clamp((d - 1) * 0.4, 0.03, 0.5);
     });
 
-    // Sun — the only light; no ambient on purpose.
+    // Sun: the only light, no ambient on purpose.
     const sun = new THREE.DirectionalLight(0xffffff, C.SUN_INTENSITY);
     const az = THREE.MathUtils.degToRad(C.SUN_AZIMUTH);
     const el = THREE.MathUtils.degToRad(C.SUN_ELEVATION);
@@ -76,7 +76,6 @@ export class MoonScene {
 
     this.scene.add(this.#makeStars());
 
-    // Moon
     const aniso = renderer.capabilities.getMaxAnisotropy();
     const color = loadTexture('moon_color.jpg', true, aniso);
     const normal = loadTexture('moon_normal.png', false, aniso);

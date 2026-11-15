@@ -1,16 +1,72 @@
-# Backend — Lunar Landing Site Navigator
+# Backend
 
-Python scripts that compute the **real** landing-site data the dashboard displays. **This folder is empty so far.** The frontend currently runs on mock data and is ready to switch to backend output once it exists.
+A FastAPI service that lists lunar landing sites and estimates solar power at each one, using Sun positions from JPL Horizons. For the project overview, see the [root README](../README.md).
 
-Read the [root README](../README.md) first for the problem and shared conventions.
+## Setup
 
-## What the backend needs to produce
+You need Python 3.10+ and internet access (each metrics request queries JPL Horizons).
 
-The frontend reads all data through one module, [`frontend/src/data/api.js`](../frontend/src/data/api.js). Its exact JSON shapes are in [`frontend/src/data/SCHEMA.md`](../frontend/src/data/SCHEMA.md). That file is the contract: if the backend returns those shapes, the frontend works unchanged.
+```powershell
+cd backend
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
 
-## Integration options (undecided)
+Interactive docs: http://127.0.0.1:8000/docs
 
-Either option works with the frontend; only the bodies of `api.js` change.
+The frontend's dev server forwards `/api/*` here, so local development needs no CORS setup.
 
-1. **Precomputed static JSON.** Scripts write files such as `sites.json`, `metrics/<siteId>/<date>.json` and `terrain/<siteId>.json` into `frontend/public/data/`. Then `api.js` does `fetch('/data/…')`. This is the simplest option and needs no server, but it limits custom coordinates and arbitrary dates.
-2. **Small HTTP API** (e.g. FastAPI): `GET /sites`, `GET /sites/{id}/metrics?t=…`, `GET /terrain?lat=…&lon=…&sizeKm=…&n=…`, with Vite dev-server proxying `/api` to it. This supports custom coordinates and any date. Terrain grids can be large, so consider binary (Float32/Int16) or gzip for `heights`.
+## Endpoints
+
+| Method and path | Returns |
+|---|---|
+| `GET /health` | Service status |
+| `GET /sites` | All sites as `{ id, lat, lon }`, in a stable order |
+| `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour` | Solar power for the time range |
+
+`start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. A 30-day request takes several seconds.
+
+Metrics response:
+
+| Field | Meaning |
+|---|---|
+| `instantaneous_power_per_area_W_m2` | Power per m² at each step, starting at `start` |
+| `daily_power_generated_per_area_kWh_per_m2_day` | Energy per m² for each 24 h block from `start`; a final partial day covers only its own hours |
+| `average_power_per_24h_W_m2` | Mean power over the whole range |
+| `average_power_sunlit_days_W_m2` | Mean power over days with any sunlight |
+
+Power is for a flat, horizontal panel, using the solar constant and panel efficiency in [`app/config.py`](app/config.py). Terrain shadowing is not included.
+
+Errors: `400` bad dates or reversed range, `404` unknown site, `502` bad data from Horizons, `503` `astroquery` not installed.
+
+## Sites
+
+The catalog is [`data/sites.py`](data/sites.py). Ids are assigned by position (`site-1`, `site-2`, …), so add new sites at the end. Coordinates are planetocentric degrees, east-positive longitude.
+
+## Configuration
+
+| Environment variable | Use |
+|---|---|
+| `CORS_ORIGINS` | Comma-separated origins allowed to call the API from a browser, e.g. `https://example.com`. Needed only when the frontend is served from a different domain. Unset means CORS is off. |
+
+## Code layout
+
+```
+app/main.py               FastAPI app, CORS
+app/config.py             settings (solar constant, efficiency, default step, CORS)
+app/api/routes/           /health and /sites endpoints
+core/                     response models, coordinate and date helpers
+services/power_services.py   Horizons query and power calculations
+data/sites.py             site catalog
+tests/                    unit tests
+```
+
+## Tests
+
+From the repository root:
+
+```powershell
+python -m unittest discover -s backend/tests -t backend -v
+```

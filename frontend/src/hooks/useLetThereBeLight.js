@@ -24,7 +24,7 @@ export function useLetThereBeLight(sceneRef) {
     try {
       localStorage.setItem(STORAGE_KEY, lit ? '1' : '0');
     } catch {
-      /* storage unavailable — state still works for this session */
+      /* storage unavailable; state still works for this session */
     }
   }, [lit, sceneRef]);
 

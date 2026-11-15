@@ -1,4 +1,4 @@
-// Builds per-site terrain packs for the Horizon View and the dashboard metrics:
+// Builds per-site terrain packs for Lunarium and the Sun/Earth model:
 //   public/terrain/<siteId>/meta.json  – layer dims, ground height, terrain horizon profile
 //   public/terrain/<siteId>/near.f32   – 2 km  local grid, Float32 metres
 //   public/terrain/<siteId>/mid.i16    – 16 km local grid, Int16 (offset + 0.5 m steps)
@@ -80,7 +80,7 @@ async function download(tile) {
   return dest;
 }
 
-// South polar stereographic (lat_0 = −90, lon_0 = 0, sphere R) — as in the PGDA GeoTIFF keys.
+// South polar stereographic (lat_0 = −90, lon_0 = 0, sphere R), as in the PGDA GeoTIFF keys.
 function toStereo(lat, lon) {
   const rho = 2 * R * Math.tan(((90 + lat) / 2) * (Math.PI / 180));
   const l = lon * (Math.PI / 180);
