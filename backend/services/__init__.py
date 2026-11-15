@@ -7,6 +7,7 @@ from .power_services import (
     calculate_energy_per_day,
     calculate_instantaneous_power_per_area,
     fetch_solar_ephemeris,
+    find_nearest_sunrise_sunset,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "calculate_energy_per_day",
     "calculate_instantaneous_power_per_area",
     "fetch_solar_ephemeris",
+    "find_nearest_sunrise_sunset",
 ]

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +11,7 @@ from services import (
     calculate_energy_per_day,
     calculate_instantaneous_power_per_area,
     fetch_solar_ephemeris,
+    find_nearest_sunrise_sunset,
 )
 
 
@@ -77,6 +79,95 @@ class PowerServiceTests(unittest.TestCase):
             calculate_beta_angle({"AZ": [0.0, 90.0], "EL": [30.0]})
         with self.assertRaisesRegex(ValueError, "between -90 and 90"):
             calculate_beta_angle({"AZ": [0.0], "EL": [91.0]})
+
+    def test_sunrise_and_sunset_are_interpolated_and_returned_in_utc(self) -> None:
+        julian_start = 2_461_041.5
+        ephemeris = {
+            "EL": [-10.0, 10.0, 10.0, -10.0],
+            "datetime_jd": [
+                julian_start,
+                julian_start + 0.25,
+                julian_start + 0.75,
+                julian_start + 1.0,
+            ],
+        }
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        sunrise, sunset = find_nearest_sunrise_sunset(
+            ephemeris,
+            start,
+            datetime(2026, 1, 2, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(sunrise, datetime(2026, 1, 1, 3, tzinfo=timezone.utc))
+        self.assertEqual(sunset, datetime(2026, 1, 1, 21, tzinfo=timezone.utc))
+
+    def test_sun_events_are_next_events_and_missing_crossings_are_none(self) -> None:
+        julian_start = 2_461_041.5
+        ephemeris = {
+            "EL": [-10.0, 10.0, 10.0, -10.0],
+            "datetime_jd": [
+                julian_start,
+                julian_start + 0.25,
+                julian_start + 0.75,
+                julian_start + 1.0,
+            ],
+        }
+        start_after_sunrise = datetime(2026, 1, 1, 4, tzinfo=timezone.utc)
+
+        sunrise, sunset = find_nearest_sunrise_sunset(
+            ephemeris,
+            start_after_sunrise,
+            datetime(2026, 1, 2, tzinfo=timezone.utc),
+        )
+
+        self.assertIsNone(sunrise)
+        self.assertEqual(sunset, datetime(2026, 1, 1, 21, tzinfo=timezone.utc))
+
+        polar_day = {
+            "EL": [10.0, 20.0],
+            "datetime_jd": [julian_start, julian_start + 1],
+        }
+        self.assertEqual(
+            find_nearest_sunrise_sunset(
+                polar_day,
+                start_after_sunrise,
+                datetime(2026, 1, 2, tzinfo=timezone.utc),
+            ),
+            (None, None),
+        )
+
+    def test_sun_events_after_requested_end_are_not_returned(self) -> None:
+        julian_start = 2_461_041.5
+        ephemeris = {
+            "EL": [-10.0, 10.0, 10.0, -10.0],
+            "datetime_jd": [
+                julian_start,
+                julian_start + 0.25,
+                julian_start + 0.75,
+                julian_start + 1.0,
+            ],
+        }
+
+        sunrise, sunset = find_nearest_sunrise_sunset(
+            ephemeris,
+            datetime(2026, 1, 1, 4, tzinfo=timezone.utc),
+            datetime(2026, 1, 1, 20, tzinfo=timezone.utc),
+        )
+
+        self.assertIsNone(sunrise)
+        self.assertIsNone(sunset)
+
+    def test_sunrise_sunset_rejects_reversed_interval(self) -> None:
+        with self.assertRaisesRegex(ValueError, "later than start time"):
+            find_nearest_sunrise_sunset(
+                {
+                    "EL": [-10.0, 10.0],
+                    "datetime_jd": [2_461_041.5, 2_461_042.5],
+                },
+                datetime(2026, 1, 2, tzinfo=timezone.utc),
+                datetime(2026, 1, 1, tzinfo=timezone.utc),
+            )
 
     def test_instantaneous_power_is_zero_below_horizon(self) -> None:
         ephemeris = {

@@ -6,8 +6,8 @@ is below.
 | Function | Source |
 |---|---|
 | `getSites()` | **Live:** backend `GET /sites`, plus display names |
-| `getSitePower(site, dateISO)` | **Live:** backend `GET /sites/{id}/metrics` (JPL Horizons) |
-| `getSkyModel(site, dateISO)` | **Mock:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
+| `getSitePower(site, dateISO)` | **Live:** backend `GET /sites/{id}/metrics` (JPL Horizons), including nearest sunrise/sunset from `dateISO` |
+| `getSkyModel(site, dateISO)` | **Modeled:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
 | `getLunariumSites()` | **Mock:** Lunarium's site list in [`mock/sites.js`](mock/sites.js) |
 | `getTerrainPatch`, `getHorizonTerrain`, `getSiteHorizon` | NASA LOLA elevation data, processed in the browser |
 | `calculatePotential(params)` | Playground. **Live** backend `GET /sites/{id}/metrics` when the coordinates match a backend site, else **mock** ([`mock/engine.js`](mock/engine.js)); terrain from LOLA |
@@ -61,11 +61,17 @@ returns values only, so sample times are rebuilt from `start` and the step.
   "totalKWhPerM2": 61.6,
   "avgWPerM2": 86,
   "avgSunlitDaysWPerM2": 160,
+  "nearestSunriseUtc": "2026-11-15T18:24:00Z",
+  "nearestSunsetUtc": "2026-11-16T04:12:00Z",
   "source": "JPL Horizons via backend"
 }
 ```
 
-## `getSkyModel(site, dateISO) → SkyModel` (mock)
+The request includes `events_from=dateISO`, so the event times are the next crossings at or after
+the selected time, even though the power-series window begins three days earlier. Both fields are
+`null` when no event occurs before the end of the 27-day window.
+
+## `getSkyModel(site, dateISO) → SkyModel` (modeled)
 
 ```json
 {
@@ -97,6 +103,8 @@ returns values only, so sample times are rebuilt from `start` and the step.
 - `hoursTo…` fields are `null` when the event is not within the window.
 - `series` is hourly, from 3 days before to 27 days after the selected time.
 - `powerW` is used only by Lunarium. The Landing Sites panel shows live power from `getSitePower`.
+- In the Landing Sites panel, the time-to-sunrise/sunset tiles use `getSitePower`'s live event
+  timestamps; Sun/Earth positions, visibility, Earth events, and illumination remain modeled locally.
 
 ## `getTerrainPatch(lat, lon, { sizeKm, n }) → TerrainPatch`
 

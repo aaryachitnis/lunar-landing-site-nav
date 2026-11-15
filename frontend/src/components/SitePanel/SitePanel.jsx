@@ -163,15 +163,21 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
       <section className="panel-section">
         <h3>
           Sun &amp; Earth
-          <span className="tag-mock" title="Simplified geometric model run in the browser until the backend provides Sun and Earth data">
-            Mock
+          <span className="tag-mock" title="Sunrise and sunset use JPL Horizons; other Sun/Earth estimates are modeled in the browser">
+            Hybrid
           </span>
         </h3>
         {sky.loading && !sky.data && <p className="muted">Computing…</p>}
         {sky.error && <p className="field-error">{errorText(sky.error)}</p>}
         {sky.data && (
           <div className={sky.loading ? 'is-refreshing' : undefined}>
-            <SkyTiles sky={sky.data} />
+            <SkyTiles
+              sky={sky.data}
+              sunEvents={power.data}
+              selectedTime={time}
+              sunEventsLoading={power.loading}
+              sunEventsError={power.error}
+            />
           </div>
         )}
       </section>

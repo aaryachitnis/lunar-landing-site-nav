@@ -1,7 +1,7 @@
 // The only module components and hooks import data from. Return shapes are in SCHEMA.md.
 //
 // Live (FastAPI backend):  getSites, getSitePower
-// Mocked in the browser:   getSkyModel (Sun/Earth positions), getLunariumSites
+// Modeled in the browser:  getSkyModel (Sun/Earth positions), getLunariumSites
 // Terrain (NASA LOLA):     getTerrainPatch, getHorizonTerrain, getSiteHorizon
 // Playground:              calculatePotential (live for backend sites, mock otherwise)
 
@@ -73,6 +73,7 @@ export function getSitePower(site, dateISO) {
       start,
       end,
       step: `${stepHours}hour`,
+      events_from: new Date(t0).toISOString(),
     });
     // Samples are evenly spaced from `start`; the response carries values only.
     const startMs = Date.parse(res.start);
@@ -95,6 +96,8 @@ export function getSitePower(site, dateISO) {
       totalKWhPerM2: daily.reduce((sum, d) => sum + d.kWhPerM2, 0),
       avgWPerM2: res.average_power_per_24h_W_m2,
       avgSunlitDaysWPerM2: res.average_power_sunlit_days_W_m2,
+      nearestSunriseUtc: res.nearest_sunrise_utc,
+      nearestSunsetUtc: res.nearest_sunset_utc,
       source: 'JPL Horizons via backend',
     };
   });
