@@ -12,6 +12,7 @@ from services.horizon import (
     HorizonsRequestError as EarthHorizonsRequestError,
     HorizonsUnavailableError as EarthHorizonsUnavailableError,
 )
+from services.terrain_height import SVS_BASE_URL
 
 
 class ApiRouteTests(unittest.TestCase):
@@ -19,6 +20,7 @@ class ApiRouteTests(unittest.TestCase):
         paths = app.openapi()["paths"]
         self.assertIn("/health", paths)
         self.assertIn("/sites", paths)
+        self.assertIn("/sites/surface-roughness", paths)
         self.assertIn("/sites/{site_id}/metrics", paths)
         self.assertIn("/sites/{site_id}/communications", paths)
 
@@ -42,6 +44,47 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(serialized["loc"], [-84.2287, 69.44396])
         self.assertEqual(serialized["lat"], -84.2287)
         self.assertEqual(serialized["lon"], 69.44396)
+
+    def test_surface_roughness_returns_only_requested_metrics_for_every_site(self) -> None:
+        sites_report = [
+            {
+                "site_id": site[0],
+                "site_name": site[1],
+                "mean_slope_deg": 1.25,
+                "max_slope_deg": 3.5,
+                "rms_surface_roughness_m": 2.0,
+            }
+            for site in sites.SITES
+        ]
+        report = {
+            "data_source": "LOLA LDEM_16 (NASA SVS 4720)",
+            "source_url": f"{SVS_BASE_URL}ldem_16.tif",
+            "resolution_m_at_equator": 1898.0,
+            "analysis_radius_km": 10.0,
+            "sites": sites_report,
+        }
+
+        with patch.object(sites, "analyse_all_sites", return_value=report) as calculate:
+            results = sites.get_surface_roughness()
+
+        self.assertEqual(results.data_source, "LOLA LDEM_16 (NASA SVS 4720)")
+        self.assertEqual(results.source_url, f"{SVS_BASE_URL}ldem_16.tif")
+        self.assertEqual(results.resolution_m_at_equator, 1898.0)
+        self.assertEqual(results.analysis_radius_km, 10.0)
+        self.assertEqual(len(results.sites), 9)
+        self.assertEqual(results.sites[0].site_id, "orig1")
+        self.assertEqual(results.sites[0].site_name, "Artemis 3 (Amundsen)")
+        self.assertEqual(
+            results.sites[0].model_dump(),
+            {
+                "site_id": "orig1",
+                "site_name": "Artemis 3 (Amundsen)",
+                "mean_slope_deg": 1.25,
+                "max_slope_deg": 3.5,
+                "rms_surface_roughness_m": 2.0,
+            },
+        )
+        calculate.assert_called_once_with()
 
     def test_unknown_site_and_invalid_ranges_return_http_errors(self) -> None:
         with self.assertRaises(HTTPException) as unknown_site:

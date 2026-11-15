@@ -26,8 +26,15 @@ The frontend's dev server forwards `/api/*` here, so local development needs no 
 | `GET /sites` | All sites with `id`, `name`, `loc`, `desc`, and `agency`; also includes `lat` and `lon` for compatibility |
 | `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour` | Solar power for the time range |
 | `GET /sites/{site_id}/communications?start=…&end=…&step=1h` | Earth visibility accounting for local LOLA terrain |
+| `GET /sites/surface-roughness` | LOLA data source and per-site mean slope, maximum slope, and detrended RMS roughness |
 
-Communication dates use ISO 8601 UTC. Optional parameters select terrain resolution (`terrain_ppd=4`, `16`, or `64`), skyline range, mountain threshold, minimum Earth elevation, whether partial Earth-disc visibility counts, and the interpolation step. The first request downloads and converts the NASA LOLA elevation grid if it is not already cached under `data/terrain` (or `LOLA_DATA_DIR`). JPL Horizons and terrain-data failures return explicit `502`/`503` errors.
+Communication dates use ISO 8601 UTC. Optional parameters select terrain resolution (`terrain_ppd=4`, `16`, or `64`), skyline range, mountain threshold, minimum Earth elevation, whether partial Earth-disc visibility counts, and the interpolation step. Terrain endpoints use the default LOLA elevation grid (16 pixels/degree) and a 10 km analysis radius. The first request downloads and converts the NASA LOLA elevation grid if it is not already cached under `data/terrain` (or `LOLA_DATA_DIR`). JPL Horizons and terrain-data failures return explicit `502`/`503` errors.
+
+To print the surface-roughness dataset and per-site metrics in the terminal instead of calling the API, run this from `backend/`:
+
+```powershell
+python -m services.surface_roughness
+```
 
 `start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. A 30-day request takes several seconds.
 

@@ -33,10 +33,10 @@ environment variable; none of it belongs in git)
     elevation/moon_elev_i16.bin    whole metres, little-endian int16, row-major
     elevation/moon_meta.json       grid size, resolution, dataset, min/max
 
-Run it directly to build or rebuild the files (like `npm run textures`):
-    python lola_terrain.py            # build if missing, at 16 pixels/degree
-    python lola_terrain.py --ppd 64   # higher resolution
-    python lola_terrain.py --force    # rebuild even if the files exist
+From the backend directory, run it as a module to build or rebuild the files:
+    python -m services.terrain_height            # build at 16 pixels/degree
+    python -m services.terrain_height --ppd 64   # higher resolution
+    python -m services.terrain_height --force    # rebuild existing files
 
 NOT TESTED against the live NASA server (my sandbox cannot reach it). The
 conversion, loading and sampling were tested on synthetic files.
@@ -45,11 +45,15 @@ import argparse
 import csv
 import json
 import os
+import sys
 import urllib.request
 from functools import lru_cache
 from pathlib import Path
  
 import numpy as np
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
  
 MOON_RADIUS_M = 1_737_400.0   # reference sphere the heights are measured from
 SVS_BASE_URL = "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/"
@@ -64,7 +68,7 @@ DATA_DIR = Path(
 # ----------------------------------------------------------------------
 # 2D list of [latitude, longitude] in degrees (east-positive longitude).
 # Approximate placeholder coordinates: replace with your own sites.
-from landing_data_processing import Sites
+from data.sites import SITES
 TERRAIN_RADIUS_KM = 10.0   # how far around each site to look
  
  
@@ -356,7 +360,7 @@ if __name__ == "__main__":
     print(f"{grid.meta['dataset']}: {grid.width} x {grid.height} pixels, "
           f"{grid.meta['resolution_m_at_equator']} m/pixel at the equator")
  
-    stats = terrain_stats(grid, Sites, args.radius_km)
+    stats = terrain_stats(grid, [site[2] for site in SITES], args.radius_km)
     print(f"\nTerrain within {args.radius_km:g} km of each site "
           f"(metres above the 1737.4 km reference sphere):")
     for r in stats:

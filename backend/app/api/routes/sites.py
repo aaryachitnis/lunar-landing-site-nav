@@ -6,13 +6,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.config import Settings
 from app.dependencies import get_app_settings
 from core.communication_models import CommunicationMetricsResponse
-from core.models import PowerMetricsResponse, SiteSummary
+from core.models import (
+    PowerMetricsResponse,
+    SiteSummary,
+    SurfaceRoughnessResponse,
+)
 from core.utils import format_utc, get_lunar_sites_loc, parse_datetime
 from data import SITES, SiteRecord, find_site_record
 from services.horizon import HorizonsRequestError as EarthHorizonsRequestError
 from services.horizon import HorizonsUnavailableError as EarthHorizonsUnavailableError
 from services.mountain_visibility import analyse_site, check_window
-from services.terrain_height import DEFAULT_PPD, VALID_PPD, load_elevation_grid
+from services.surface_roughness import analyse_all_sites
+from services.terrain_height import (
+    DEFAULT_PPD,
+    VALID_PPD,
+    load_elevation_grid,
+)
 from services import (
     HorizonsRequestError,
     HorizonsUnavailableError,
@@ -51,6 +60,30 @@ def resolve_site(site_id: str) -> SiteSummary:
 @router.get("", response_model=list[SiteSummary])
 def get_sites() -> list[SiteSummary]:
     return list_sites()
+
+
+@router.get(
+    "/surface-roughness",
+    response_model=SurfaceRoughnessResponse,
+    description=(
+        "Return mean slope, maximum slope, and detrended RMS surface roughness "
+        "for every catalog site, including the LOLA dataset used."
+    ),
+)
+def get_surface_roughness() -> SurfaceRoughnessResponse:
+    try:
+        report = analyse_all_sites()
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Terrain data is unavailable: {exc}",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not calculate surface roughness: {exc}",
+        ) from exc
+    return SurfaceRoughnessResponse(**report)
 
 
 @router.get("/{site_id}/metrics", response_model=PowerMetricsResponse)
