@@ -35,7 +35,10 @@
 .site-row:hover { background: var(--surface-2); }
 .site-row.active { background: var(--accent-dim); border-left-color: var(--accent); }
 .site-row.active .site-row-name { color: var(--accent); }
-.site-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-row { align-items: baseline; }
+.site-row-name { min-width: 0; display: flex; flex-direction: column; }
+.site-row-name, .site-row-region { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-row-region { color: var(--text-muted); font-size: 12px; }
 .site-row-coords { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .field-error { color: var(--critical); font-size: 12px; margin: 6px 0 0; }
 .muted { color: var(--text-muted); }
