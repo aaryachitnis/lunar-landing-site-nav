@@ -49,7 +49,7 @@ export async function getLunariumSite(id) {
   const local = MOCK_SITES.find((s) => s.id === id);
   if (local) return local;
   const live = await getSites().catch(() => []);
-  return live.find((s) => s.id === id) ?? null;
+  return live.find((s) => s.id === id || s.legacyId === id) ?? null;
 }
 
 // ── Solar power (live) ─────────────────────────────────────────────────────

@@ -18,25 +18,30 @@ astronomical horizon unless the field says `AboveHorizon` (relative to the local
 
 ## `getSites() → Site[]`
 
-The backend returns `{ id, lat, lon }`. [`siteCatalog.js`](siteCatalog.js) adds display fields by
-matching coordinates against known landing sites (within 0.05°). Unmatched sites are named
-"Site N".
+The backend returns `{ id, name, desc, agency, loc, lat, lon }`. [`siteCatalog.js`](siteCatalog.js)
+reshapes each site for the UI:
 
 ```json
 {
-  "id": "site-3",
-  "lat": 0.67138,
-  "lon": 23.47398,
-  "name": "Apollo 11",
-  "category": "artemis-candidate | clps | international | apollo | south-pole | other",
+  "id": "orig2",
+  "lat": 20.19032,
+  "lon": 30.77314,
+  "name": "Apollo 17",
+  "region": "Taurus-Littrow",
+  "fullName": "Apollo 17 (Taurus-Littrow)",
   "agency": "NASA",
-  "notes": "Mare Tranquillitatis (1969).",
-  "terrainId": "apollo-11"
+  "description": "Final Apollo lunar landing site, situated in the Taurus-Littrow valley …",
+  "category": "artemis-candidate | apollo | south-pole | other",
+  "terrainId": "apollo-17",
+  "legacyId": "site-2"
 }
 ```
 
-`terrainId` is set for matched sites. It names the prebuilt terrain pack, and lets a Lunarium
-link (`?site=apollo-11`) select the same site on the Landing Sites tab.
+- `name` and `region` are split from the backend name "Mission (Region)". Names without brackets have no region.
+- `category` comes from the name (Apollo, Artemis) or latitude (below 80°S is south pole).
+- `terrainId` is set when a Lunarium terrain pack exists within 0.05° of the site. It also lets a
+  Lunarium link (`?site=apollo-17`) select the same site on the Landing Sites tab.
+- `legacyId` is the backend's old position-based id, so links shared before sites were named still work.
 
 ## `getSitePower(site, dateISO) → SitePower`
 

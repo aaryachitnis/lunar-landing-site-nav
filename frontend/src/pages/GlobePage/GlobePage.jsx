@@ -35,8 +35,8 @@ export default function GlobePage() {
 
   const sites = useMemo(() => fetchedSites ?? [], [fetchedSites]);
 
-  // Lunarium links may carry its own site ids (e.g. apollo-11); match those via terrainId.
-  const selectedSite = sites.find((s) => s.id === siteId) ?? sites.find((s) => s.terrainId === siteId) ?? null;
+  // Also accept Lunarium ids (apollo-11) and the backend's old ids (site-3) from shared links.
+  const selectedSite = sites.find((s) => s.id === siteId) ?? sites.find((s) => s.terrainId === siteId || s.legacyId === siteId) ?? null;
   const close = useCallback(() => clearSite(), [clearSite]);
 
   const insets = narrow
