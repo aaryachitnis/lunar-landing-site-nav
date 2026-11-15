@@ -1,16 +1,57 @@
 # Backend — Lunar Landing Site Navigator
 
-Python scripts that compute the **real** landing-site data the dashboard displays. **This folder is empty so far.** The frontend currently runs on mock data and is ready to switch to backend output once it exists.
+The backend is a FastAPI service that lists lunar landing sites and calculates
+solar power estimates from JPL Horizons ephemerides. It requires Python 3.10+
+and internet access when requesting metrics from Horizons.
 
-Read the [root README](../README.md) first for the problem and shared conventions.
+## Setup
 
-## What the backend needs to produce
+From this directory, create and activate a virtual environment, then install
+the dependencies:
 
-The frontend reads all data through one module, [`frontend/src/data/api.js`](../frontend/src/data/api.js). Its exact JSON shapes are in [`frontend/src/data/SCHEMA.md`](../frontend/src/data/SCHEMA.md). That file is the contract: if the backend returns those shapes, the frontend works unchanged.
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
 
-## Integration options (undecided)
+Start the API:
 
-Either option works with the frontend; only the bodies of `api.js` change.
+```powershell
+uvicorn app.main:app --reload
+```
 
-1. **Precomputed static JSON.** Scripts write files such as `sites.json`, `metrics/<siteId>/<date>.json` and `terrain/<siteId>.json` into `frontend/public/data/`. Then `api.js` does `fetch('/data/…')`. This is the simplest option and needs no server, but it limits custom coordinates and arbitrary dates.
-2. **Small HTTP API** (e.g. FastAPI): `GET /sites`, `GET /sites/{id}/metrics?t=…`, `GET /terrain?lat=…&lon=…&sizeKm=…&n=…`, with Vite dev-server proxying `/api` to it. This supports custom coordinates and any date. Terrain grids can be large, so consider binary (Float32/Int16) or gzip for `heights`.
+Interactive API documentation is served at `http://127.0.0.1:8000/docs`.
+`power_gen.py` is the retained legacy implementation; the structured backend
+does not depend on running it.
+
+## Endpoints
+
+- `GET /health` — returns service status.
+- `GET /sites` — returns the ordered site IDs and coordinates.
+- `GET /sites/{site_id}/metrics?start=<ISO-8601>&end=<ISO-8601>&step=4hour`
+  — fetches Sun ephemerides and returns per-area power estimates for the time
+  range. `start` and `end` are required; `step` defaults to `4hour`.
+
+The catalog is in [`data/sites.py`](data/sites.py). Its order is stable because
+the API assigns IDs as `site-1`, `site-2`, and so on. Coordinates use
+planetocentric latitude and east-positive longitude in degrees.
+
+Datetime inputs may include a `Z` suffix or an explicit UTC offset. Naive
+datetimes are interpreted as UTC. Invalid dates or reversed ranges return
+`400`, unknown site IDs return `404`, malformed Horizons data returns `502`,
+and a missing `astroquery` installation returns `503`.
+
+Power estimates use the solar constant and panel efficiency from
+[`app/config.py`](app/config.py). The shared calculations live in
+[`services/power_services.py`](services/power_services.py). Daily energy is
+integrated from samples in kWh/m²; a final partial day is integrated only over
+its observed duration.
+
+## Tests
+
+From the repository root, run:
+
+```powershell
+python -m unittest discover -s backend/tests -t backend -v
+```
