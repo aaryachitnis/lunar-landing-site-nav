@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import Settings
@@ -11,6 +13,7 @@ from services import (
     calculate_energy_per_day,
     calculate_instantaneous_power_per_area,
     fetch_solar_ephemeris,
+    find_nearest_sunrise_sunset,
 )
 
 router = APIRouter(prefix="/sites", tags=["sites"])
@@ -56,16 +59,28 @@ def get_site_metrics(
         description="Time step for the Horizons query (for example 4hour).",
     ),
     settings: Settings = Depends(get_app_settings),
+    events_from: Annotated[
+        str | None,
+        Query(description="Start time for sunrise/sunset search; defaults to start."),
+    ] = None,
 ) -> PowerMetricsResponse:
     site = resolve_site(site_id)
     try:
         start_datetime = parse_datetime(start)
         end_datetime = parse_datetime(end)
+        events_start_datetime = (
+            parse_datetime(events_from) if events_from is not None else start_datetime
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     if end_datetime <= start_datetime:
         raise HTTPException(status_code=400, detail="End time must be later than start time.")
+    if not start_datetime <= events_start_datetime <= end_datetime:
+        raise HTTPException(
+            status_code=400,
+            detail="Sunrise/sunset search start must be within the requested range.",
+        )
     step = step.strip()
     if not step:
         raise HTTPException(status_code=400, detail="Horizons step must not be empty.")
@@ -92,6 +107,11 @@ def get_site_metrics(
             panel_efficiency=settings.solar_panel_efficiency,
         )
         daily_energy = calculate_energy_per_day(instantaneous_power, ephemeris)
+        sunrise, sunset = find_nearest_sunrise_sunset(
+            ephemeris,
+            events_start_datetime,
+            end_datetime,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=502,
@@ -114,6 +134,8 @@ def get_site_metrics(
         start=format_utc(start_datetime),
         end=format_utc(end_datetime),
         step=step,
+        nearest_sunrise_utc=format_utc(sunrise) if sunrise is not None else None,
+        nearest_sunset_utc=format_utc(sunset) if sunset is not None else None,
         instantaneous_power_per_area_W_m2=[
             float(value) for value in instantaneous_power
         ],

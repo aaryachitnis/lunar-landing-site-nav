@@ -36,24 +36,60 @@ export function PowerTiles({ power }) {
   );
 }
 
-/** Mock Sun and Earth model. See SCHEMA.md → SkyModel. */
-export function SkyTiles({ sky }) {
+/** Modeled Sun/Earth metrics with sunrise and sunset from the live backend. */
+export function SkyTiles({
+  sky,
+  sunEvents,
+  selectedTime,
+  sunEventsLoading,
+  sunEventsError,
+}) {
   const { now, window: w } = sky;
   const windowNote = `next ${w.days} d`;
   const vsTerrain = (above) => `${above >= 0 ? '+' : ''}${above.toFixed(1)}° vs terrain`;
-  const until = (label, hours) => (
-    <Tile label={label} value={formatDuration(hours)} sub={hours == null ? `not within ${windowNote}` : 'incl. terrain horizon'} />
-  );
+  const hoursUntil = (eventTime) => {
+    if (!eventTime) return null;
+    const delta = Date.parse(eventTime) - Date.parse(selectedTime);
+    return Number.isFinite(delta) && delta >= -1000 ? Math.max(0, delta / 3.6e6) : null;
+  };
+  const until = (label, eventTime) => {
+    const hours = hoursUntil(eventTime);
+    const loading = sunEventsLoading;
+    const unavailable = !loading && sunEventsError;
+    return (
+      <Tile
+        label={label}
+        value={loading ? '…' : formatDuration(unavailable ? null : hours)}
+        sub={
+          loading
+            ? 'JPL Horizons'
+            : unavailable
+              ? 'JPL Horizons unavailable'
+              : hours == null
+                ? `not within ${windowNote}`
+                : 'JPL Horizons · astronomical horizon'
+        }
+      />
+    );
+  };
   return (
     <div className="tiles">
       <Tile label="Sun altitude" value={formatDeg(now.sunElevation)} sub={`az ${formatDeg(now.sunAzimuth, 0)} · ${vsTerrain(now.sunAboveHorizon)}`} />
       <Tile label="Sun visible" value={<YesNo ok={now.sunUp} />} sub="at selected time" />
-      {until('Time to sunset', now.hoursToSunset)}
-      {until('Time to sunrise', now.hoursToSunrise)}
+      {until('Time to sunset', sunEvents?.nearestSunsetUtc)}
+      {until('Time to sunrise', sunEvents?.nearestSunriseUtc)}
       <Tile label="Earth altitude" value={formatDeg(now.earthElevation)} sub={`az ${formatDeg(now.earthAzimuth, 0)} · ${vsTerrain(now.earthAboveHorizon)}`} />
       <Tile label="Earth visible" value={<YesNo ok={now.earthUp} />} sub="at selected time" />
-      {until('Time to Earthset', now.hoursToEarthset)}
-      {until('Time to Earthrise', now.hoursToEarthrise)}
+      <Tile
+        label="Time to Earthset"
+        value={formatDuration(now.hoursToEarthset)}
+        sub={now.hoursToEarthset == null ? `not within ${windowNote}` : 'modeled'}
+      />
+      <Tile
+        label="Time to Earthrise"
+        value={formatDuration(now.hoursToEarthrise)}
+        sub={now.hoursToEarthrise == null ? `not within ${windowNote}` : 'modeled'}
+      />
       <Tile label="Sunlit" value={`${Math.round(w.illuminatedFraction * 100)}%`} sub={windowNote} />
       <Tile label="Longest darkness" value={formatDuration(w.longestDarknessH)} sub={windowNote} />
     </div>

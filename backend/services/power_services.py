@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
 import numpy as np
@@ -10,6 +11,8 @@ DEFAULT_SOLAR_INTENSITY_W_M2 = 1361.0
 DEFAULT_PANEL_EFFICIENCY = 0.2
 SECONDS_PER_DAY = 86_400.0
 JOULES_PER_KILOWATT_HOUR = 3_600_000.0
+JULIAN_DATE_UNIX_EPOCH = 2_440_587.5
+JULIAN_DATE_COMPARISON_TOLERANCE = 1e-9
 
 
 class EphemerisData(Protocol):
@@ -22,6 +25,105 @@ class HorizonsUnavailableError(RuntimeError):
 
 class HorizonsRequestError(RuntimeError):
     """Raised when a request to JPL Horizons fails."""
+
+
+def find_nearest_sunrise_sunset(
+    ephemeris: EphemerisData,
+    start: datetime,
+    end: datetime,
+) -> tuple[datetime | None, datetime | None]:
+    """Find the next horizon crossings within the requested interval, in UTC.
+
+    Sunrise and sunset are estimated by linearly interpolating the solar
+    elevation between adjacent Horizons samples.
+    """
+    elevations = _column_as_floats(ephemeris, "EL")
+    timestamps_jd = _column_as_floats(ephemeris, "datetime_jd")
+    if len(elevations) != len(timestamps_jd):
+        raise ValueError("Solar elevations and timestamps must have equal lengths.")
+    if len(timestamps_jd) < 2:
+        raise ValueError("At least two timestamped solar elevations are required.")
+    if np.any(np.diff(timestamps_jd) <= 0):
+        raise ValueError("Timestamps must be strictly increasing.")
+    if np.any((elevations < -90.0) | (elevations > 90.0)):
+        raise ValueError("Sun elevation values must be between -90 and 90 degrees.")
+
+    start_utc = (
+        start.replace(tzinfo=timezone.utc)
+        if start.tzinfo is None
+        else start.astimezone(timezone.utc)
+    )
+    end_utc = (
+        end.replace(tzinfo=timezone.utc)
+        if end.tzinfo is None
+        else end.astimezone(timezone.utc)
+    )
+    if end_utc <= start_utc:
+        raise ValueError("End time must be later than start time.")
+    start_jd = (
+        start_utc.timestamp() / SECONDS_PER_DAY + JULIAN_DATE_UNIX_EPOCH
+    )
+    end_jd = end_utc.timestamp() / SECONDS_PER_DAY + JULIAN_DATE_UNIX_EPOCH
+    sunrise_jd: float | None = None
+    sunset_jd: float | None = None
+
+    for index in range(1, len(elevations)):
+        previous_elevation = elevations[index - 1]
+        current_elevation = elevations[index]
+        if previous_elevation <= 0.0 < current_elevation:
+            crossing_jd = _interpolate_horizon_crossing(
+                timestamps_jd[index - 1],
+                timestamps_jd[index],
+                previous_elevation,
+                current_elevation,
+            )
+            if (
+                start_jd - JULIAN_DATE_COMPARISON_TOLERANCE
+                <= crossing_jd
+                <= end_jd + JULIAN_DATE_COMPARISON_TOLERANCE
+            ) and (
+                sunrise_jd is None or crossing_jd < sunrise_jd
+            ):
+                sunrise_jd = crossing_jd
+        elif previous_elevation >= 0.0 > current_elevation:
+            crossing_jd = _interpolate_horizon_crossing(
+                timestamps_jd[index - 1],
+                timestamps_jd[index],
+                previous_elevation,
+                current_elevation,
+            )
+            if (
+                start_jd - JULIAN_DATE_COMPARISON_TOLERANCE
+                <= crossing_jd
+                <= end_jd + JULIAN_DATE_COMPARISON_TOLERANCE
+            ) and (
+                sunset_jd is None or crossing_jd < sunset_jd
+            ):
+                sunset_jd = crossing_jd
+
+    return (
+        _julian_date_to_utc(sunrise_jd) if sunrise_jd is not None else None,
+        _julian_date_to_utc(sunset_jd) if sunset_jd is not None else None,
+    )
+
+
+def _interpolate_horizon_crossing(
+    start_jd: float,
+    end_jd: float,
+    start_elevation: float,
+    end_elevation: float,
+) -> float:
+    fraction = -start_elevation / (end_elevation - start_elevation)
+    return start_jd + fraction * (end_jd - start_jd)
+
+
+def _julian_date_to_utc(julian_date: float) -> datetime:
+    seconds_since_unix_epoch = (
+        julian_date - JULIAN_DATE_UNIX_EPOCH
+    ) * SECONDS_PER_DAY
+    return datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(
+        seconds=seconds_since_unix_epoch
+    )
 
 
 def fetch_solar_ephemeris(

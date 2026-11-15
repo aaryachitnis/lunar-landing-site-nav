@@ -43,6 +43,14 @@ class PowerMetricsResponse(BaseModel):
     start: str
     end: str
     step: str
+    nearest_sunrise_utc: str | None = Field(
+        default=None,
+        description="Next estimated sunrise at or after events_from (or start), in UTC ISO 8601.",
+    )
+    nearest_sunset_utc: str | None = Field(
+        default=None,
+        description="Next estimated sunset at or after events_from (or start), in UTC ISO 8601.",
+    )
     instantaneous_power_per_area_W_m2: list[float] = Field(
         description="Power per unit area for each sampled timestep."
     )
