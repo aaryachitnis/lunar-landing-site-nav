@@ -10,9 +10,11 @@ npm run dev          # http://localhost:5173
 npm run build        # production build → dist/
 npm run preview      # serve the build on http://localhost:4173
 npm run textures     # (re)generate public/textures/ from NASA source maps
+npm run terrain      # (re)build public/terrain/ site packs for the Horizon View (needs textures)
+npm run dev:phone    # HTTPS dev server on the LAN (phone motion sensors need a secure context)
 ```
 
-`dev` and `build` automatically run `npm run textures --if-missing` first. The first run downloads ~80 MB into `scripts/.cache/` and takes ~30 s. Generated files are git-ignored.
+`dev` and `build` automatically run `textures` and then `terrain` with `--if-missing` first. The first run downloads ~80 MB of global maps plus ~300 MB of NASA PGDA 5 m polar DEMs into `scripts/.cache/` (a few minutes). Generated files are git-ignored. When hosting, set `VITE_DATA_BASE` to serve `textures/` and `terrain/` from a CDN (see `scene/config.js`).
 
 ## What the user sees
 
@@ -33,6 +35,15 @@ npm run textures     # (re)generate public/textures/ from NASA source maps
      - longest darkness
   5. Timeline from −3 to +27 days: a solar power chart and a Sun/Earth elevation-above-terrain-horizon chart with synced hover, plus a daily table.
 - When a site is selected the camera flies to it. The globe's centre shifts so it sits in the space left free by the panels.
+
+**`/horizon` — Horizon View** (`src/pages/HorizonPage/`, opened from the site panel's "Stand here" button)
+
+- First-person view standing at the site (2 m eye height): real terrain to the horizon (NASA 5 m LOLA within 8 km at Shackleton, Connecting Ridge, de Gerlache, Leibnitz Beta and Malapert; global grid elsewhere and beyond), generated craters/rocks/regolith within ~1 km (cosmetic only), black sky, Sun and Earth at true size and position, Earth phase.
+- Look around: drag/scroll on desktop; **📱 Motion** uses phone orientation sensors (relative yaw, HTTPS only). Pinch/scroll zooms.
+- Labels on Sun and Earth: visible / partly blocked / hidden, degrees above the ridge, % of disk, time to set/rise, power, and **Follow** (locks the view on the body while time runs). Edge arrows point to off-screen bodies; tap to turn to them. Compass strip on top.
+- Time bar: −12 h … +3 d around the landing time `t`, Sun and Earth visibility rows, play (1×, 1 h/s, 6 h/s), scrub, back to landing, jump to the next sunrise/sunset or Earthrise/Earthset. Scrubbing never moves the camera.
+- Same terrain horizon as the site panel metrics, so numbers agree. `?stats` shows fps / pixel ratio / shadow-compute time; `?yaw=…&pitch=…` sets the initial view.
+- Rendering (`scene/HorizonScene.js`): sky, far and near terrain in three passes with separate depth ranges; renders only when something changes; Sun shadowing from distant ridges is computed in a worker (`scene/sunVisibility.worker.js`) only when the Sun moves; pixel ratio adapts to frame time.
 
 **`*`:** 404 page.
 
@@ -161,8 +172,10 @@ Source: https://svs.gsfc.nasa.gov/4720 (public domain). Flags: `--if-missing` sk
 |---|---|---|
 | `getSites()` | `Site[]` | `mock/sites.js` |
 | `getSite(id)` | `Site` | mock list, or parses a `custom_…` id |
-| `getSiteMetrics(site, dateISO)` | `SiteMetrics` | `mock/metrics.js` over the real elevation grid |
+| `getSiteMetrics(site, dateISO)` | `SiteMetrics` | `mock/metrics.js` with the site's terrain horizon |
 | `getTerrainPatch(lat, lon, { sizeKm, n })` | `TerrainPatch` | sampled from the real elevation grid on a local tangent plane |
+| `getHorizonTerrain(site)` | `HorizonTerrain` | precomputed site pack (`public/terrain/<id>/`), else built from the grid |
+| `getSiteHorizon(site)` | terrain horizon | pack `meta.json`; also feeds `getSiteMetrics`, so panel and Horizon View agree |
 
 The shapes are documented in [src/data/SCHEMA.md](src/data/SCHEMA.md). **To connect the backend**, replace these function bodies with `fetch()` calls returning the same shapes. Nothing else should need to change. Note that `TerrainPatch.heights` is a `Float32Array` in the mock; a JSON `number[]` also works, because `TerrainView` only indexes into it.
 
@@ -199,7 +212,8 @@ Headless screenshots work with Chrome: `--headless=new --use-angle=swiftshader -
 
 ## Known limitations
 
-- Terrain and horizons come from 1.9 km/px data: too coarse for real polar lighting analysis.
+- Horizons use NASA 5 m data within 8 km for five polar sites and 1.9 km/px data elsewhere and beyond 8 km. In the 5 m data ~90 % of pixels are interpolated between laser tracks (per NASA).
+- The five 5 m site coordinates were moved (≤ 1.5 km) onto the highest gentle-slope point in the 5 m data; de Gerlache moved to its PGDA tile centre.
 - The elevation grid (33 MB) loads the first time a panel opens.
 - The JS bundle is ~1.25 MB (three.js + recharts); code-splitting hasn't been done.
 - Site coordinates are approximate mock values.

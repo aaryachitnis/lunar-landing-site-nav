@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { SITE_CATEGORIES } from '../../data/mock/sites.js';
 import { useSiteMetrics } from '../../hooks/useSiteMetrics.js';
 import { useTerrainPatch } from '../../hooks/useTerrainPatch.js';
@@ -53,6 +54,9 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
           <p className="panel-sub">
             {site.agency} · {site.notes}
           </p>
+          <Link className="stand-here" to={`/horizon?site=${encodeURIComponent(site.id)}&t=${encodeURIComponent(time)}`}>
+            🧑‍🚀 Stand here · look at the horizon →
+          </Link>
         </div>
         <button className="icon-btn" onClick={onClose} aria-label="Close panel">
           ✕
