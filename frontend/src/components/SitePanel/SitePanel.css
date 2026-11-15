@@ -66,3 +66,18 @@
 @media (max-width: 760px) {
   .site-panel { top: auto; height: 65%; width: 100%; border-left: 0; border-top: 1px solid var(--border-strong); }
 }
+
+.stand-here {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-dim);
+  color: var(--accent);
+  text-decoration: none;
+  font: 600 12px/1.2 var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.stand-here:hover { box-shadow: var(--glow); }

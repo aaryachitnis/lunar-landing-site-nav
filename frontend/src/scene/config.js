@@ -1,5 +1,9 @@
 // Fixed look of the globe (chosen by the team — not user-adjustable).
-export const TEXTURE_BASE = '/textures/';
+// Generated data (textures, per-site terrain packs). Served from public/ in dev; when hosting,
+// set VITE_DATA_BASE (e.g. https://cdn.example.com/lunar/) to serve the large files from a CDN.
+export const DATA_BASE = import.meta.env?.VITE_DATA_BASE ?? '/';
+export const TEXTURE_BASE = `${DATA_BASE}textures/`;
+export const TERRAIN_BASE = `${DATA_BASE}terrain/`;
 
 export const SUN_AZIMUTH = 60; // degrees around the Y axis (0 = towards the default camera)
 export const SUN_ELEVATION = 5; // degrees above the equator
