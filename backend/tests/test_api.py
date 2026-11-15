@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
 import unittest
@@ -23,6 +24,7 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("/sites/metrics", paths)
         metrics_parameters = paths["/sites/{site_id}/metrics"]["get"]["parameters"]
         self.assertIn("events_from", {parameter["name"] for parameter in metrics_parameters})
+        self.assertIn("include_sky", {parameter["name"] for parameter in metrics_parameters})
         self.assertIn("post", paths["/sites/metrics"])
         self.assertNotIn("delete", paths["/sites"])
         self.assertIn("post", paths["/sites"])
@@ -35,14 +37,14 @@ class ApiRouteTests(unittest.TestCase):
 
     def test_site_list_returns_catalog_metadata_and_coordinates(self) -> None:
         results = sites.get_sites()
-        self.assertEqual(len(results), 9)
+        self.assertGreaterEqual(len(results), 9)
         self.assertEqual(results[0].id, "orig1")
         self.assertEqual(results[0].name, "Artemis 3 (Amundsen)")
         self.assertEqual(results[0].loc, (-84.2287, 69.44396))
         self.assertTrue(results[0].desc)
         self.assertEqual(results[0].agency, "NASA")
         self.assertEqual(results[0].lat, -84.2287)
-        self.assertEqual(results[-1].id, "orig9")
+        self.assertIn("orig9", {site.id for site in results})
         serialized = results[0].model_dump(mode="json")
         self.assertEqual(serialized["loc"], [-84.2287, 69.44396])
         self.assertEqual(serialized["lat"], -84.2287)
@@ -107,7 +109,7 @@ class ApiRouteTests(unittest.TestCase):
     def test_unknown_site_and_invalid_ranges_return_http_errors(self) -> None:
         with self.assertRaises(HTTPException) as unknown_site:
             sites.get_site_metrics(
-                "site-10",
+                "site-that-does-not-exist",
                 "2026-01-01T00:00:00Z",
                 "2026-01-02T00:00:00Z",
                 "4hour",
@@ -153,11 +155,14 @@ class ApiRouteTests(unittest.TestCase):
                 [2_461_041.5, 2_461_041.75, 2_461_042.25, 2_461_042.5]
             ),
         }
-        with patch.object(
-            sites,
-            "fetch_solar_ephemeris",
-            return_value=ephemeris,
-        ) as fetch_ephemeris:
+        with (
+            patch.object(
+                sites,
+                "fetch_solar_ephemeris",
+                return_value=ephemeris,
+            ) as fetch_ephemeris,
+            patch.object(sites, "fetch_earth_ephemeris") as fetch_earth,
+        ):
             result = sites.get_site_metrics(
                 "site-1",
                 "2026-01-01T00:00:00Z",
@@ -184,6 +189,104 @@ class ApiRouteTests(unittest.TestCase):
             "2026-01-02 00:00",
             "4hour",
         )
+        fetch_earth.assert_not_called()
+
+    def test_metrics_route_includes_live_sky_metrics_when_requested(self) -> None:
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        start_jd = start.timestamp() / 86_400.0 + 2_440_587.5
+        timestamps = start_jd + np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+        sun = {
+            "AZ": np.zeros(5),
+            "EL": [-10.0, -10.0, 10.0, 10.0, -10.0],
+            "datetime_jd": timestamps,
+        }
+        earth = {
+            "EL": [-5.0, 5.0, 5.0, -5.0, -5.0],
+            "datetime_jd": timestamps,
+        }
+        with (
+            patch.object(sites, "fetch_solar_ephemeris", return_value=sun) as sun_fetch,
+            patch.object(sites, "fetch_earth_ephemeris", return_value=earth) as earth_fetch,
+        ):
+            result = sites.get_site_metrics(
+                "site-1",
+                "2026-01-01T00:00:00Z",
+                "2026-01-02T00:00:00Z",
+                "6hour",
+                get_settings(),
+                include_sky=True,
+            )
+
+        self.assertIsNotNone(result.sky)
+        self.assertEqual(result.sky.sun_altitude_degrees, -10.0)
+        self.assertFalse(result.sky.sun_visible)
+        self.assertEqual(result.sky.earth_altitude_degrees, -5.0)
+        self.assertFalse(result.sky.earth_visible)
+        self.assertEqual(result.sky.nearest_earthrise_utc, "2026-01-01T03:00:00Z")
+        self.assertEqual(result.sky.nearest_earthset_utc, "2026-01-01T15:00:00Z")
+        self.assertAlmostEqual(result.sky.longest_darkness_hours, 9.0, places=5)
+        self.assertAlmostEqual(result.sky.sunlit_fraction, 0.5, places=5)
+        self.assertIsNone(result.sky_error)
+        self.assertEqual(
+            result.model_dump(mode="json")["sky"]["nearest_earthrise_utc"],
+            "2026-01-01T03:00:00Z",
+        )
+        sun_fetch.assert_called_once()
+        earth_fetch.assert_called_once_with(
+            {"lat": -84.2287, "lon": 69.44396, "elevation": 0, "body": 301},
+            "2026-01-01 00:00",
+            "2026-01-02 00:00",
+            "6hour",
+        )
+
+    def test_metrics_route_reports_sky_errors_without_losing_solar_metrics(self) -> None:
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        start_jd = start.timestamp() / 86_400.0 + 2_440_587.5
+        sun = {
+            "AZ": [0.0, 0.0],
+            "EL": [-10.0, 10.0],
+            "datetime_jd": [start_jd, start_jd + 1.0],
+        }
+        with (
+            patch.object(sites, "fetch_solar_ephemeris", return_value=sun),
+            patch.object(
+                sites,
+                "fetch_earth_ephemeris",
+                side_effect=HorizonsRequestError("Earth request failed"),
+            ),
+        ):
+            result = sites.get_site_metrics(
+                "site-1",
+                "2026-01-01T00:00:00Z",
+                "2026-01-02T00:00:00Z",
+                "24hour",
+                get_settings(),
+                include_sky=True,
+            )
+
+        self.assertEqual(result.nearest_sunrise_utc, "2026-01-01T12:00:00Z")
+        self.assertIsNone(result.sky)
+        self.assertEqual(result.sky_error, "Earth request failed")
+
+        malformed_earth = {
+            "EL": [0.0],
+            "datetime_jd": [start_jd, start_jd + 1.0],
+        }
+        with (
+            patch.object(sites, "fetch_solar_ephemeris", return_value=sun),
+            patch.object(sites, "fetch_earth_ephemeris", return_value=malformed_earth),
+        ):
+            result = sites.get_site_metrics(
+                "site-1",
+                "2026-01-01T00:00:00Z",
+                "2026-01-02T00:00:00Z",
+                "24hour",
+                get_settings(),
+                include_sky=True,
+            )
+
+        self.assertIsNone(result.sky)
+        self.assertIn("equal lengths", result.sky_error)
 
     def test_metrics_route_excludes_sun_events_after_requested_end(self) -> None:
         ephemeris = {

@@ -6,8 +6,8 @@ is below.
 | Function | Source |
 |---|---|
 | `getSites()` | **Live:** backend `GET /sites`, plus display names |
-| `getSitePower(site, dateISO)` | **Live:** backend `GET /sites/{id}/metrics` (JPL Horizons), including nearest sunrise/sunset from `dateISO` |
-| `getSkyModel(site, dateISO)` | **Modeled:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
+| `getSitePower(site, dateISO)` | **Live:** backend `GET /sites/{id}/metrics` (JPL Horizons), including Sun/Earth metrics and nearest events from `dateISO` |
+| `getSkyModel(site, dateISO)` | **Modeled:** geometric model in [`mock/metrics.js`](mock/metrics.js), used by the horizon visualization |
 | `getLunariumSites()` | **Mock:** Lunarium's site list in [`mock/sites.js`](mock/sites.js) |
 | `getTerrainPatch`, `getHorizonTerrain`, `getSiteHorizon` | NASA LOLA elevation data, processed in the browser |
 | `calculatePotential(params)` | Playground. **Live** backend metrics for saved sites and custom coordinates; mock only if the backend request fails. Terrain from LOLA |
@@ -50,9 +50,10 @@ calculating metrics.
 
 ## `getSitePower(site, dateISO) → SitePower`
 
-Calls `GET /sites/{id}/metrics?start=…&end=…&step=2hour` for a window from 3 days before to 27
-days after `dateISO`. Power is for a flat panel, per m², with no terrain shadowing. The backend
-returns values only, so sample times are rebuilt from `start` and the step.
+Calls `GET /sites/{id}/metrics?start=…&end=…&step=2hour&events_from=…&include_sky=true` for a
+window from 3 days before to 27 days after `dateISO`. Power is for a flat panel, per m², with no
+terrain shadowing. The backend returns values only, so sample times are rebuilt from `start` and
+the step.
 
 ```json
 {
@@ -68,13 +69,26 @@ returns values only, so sample times are rebuilt from `start` and the step.
   "avgSunlitDaysWPerM2": 160,
   "nearestSunriseUtc": "2026-11-15T18:24:00Z",
   "nearestSunsetUtc": "2026-11-16T04:12:00Z",
+  "sky": {
+    "sunAltitudeDeg": 19.6, "sunVisible": true,
+    "earthAltitudeDeg": 30.6, "earthVisible": true,
+    "nearestEarthriseUtc": "2026-11-16T03:00:00Z",
+    "nearestEarthsetUtc": "2026-11-16T15:00:00Z",
+    "longestDarknessH": 14.5, "sunlitFraction": 0.47
+  },
+  "skyError": null,
+  "windowDays": 27,
   "source": "JPL Horizons via backend"
 }
 ```
 
-The request includes `events_from=dateISO`, so the event times are the next crossings at or after
-the selected time, even though the power-series window begins three days earlier. Both fields are
-`null` when no event occurs before the end of the 27-day window.
+The request includes `events_from=dateISO`, so sky state is sampled at the selected time and all
+event searches begin there, even though the power-series window begins three days earlier. Event
+timestamps are `null` when no crossing occurs before the end of the 27-day window. Longest
+darkness and sunlit fraction cover the selected time through the end of that window. Visibility
+and darkness use the astronomical horizon; terrain obstruction is not included. If optional sky
+metrics fail, `skyError` carries the reason and the solar power and sunrise/sunset data remain
+available.
 
 ## `getSkyModel(site, dateISO) → SkyModel` (modeled)
 
@@ -108,8 +122,8 @@ the selected time, even though the power-series window begins three days earlier
 - `hoursTo…` fields are `null` when the event is not within the window.
 - `series` is hourly, from 3 days before to 27 days after the selected time.
 - `powerW` is used only by Lunarium. The Landing Sites panel shows live power from `getSitePower`.
-- In the Landing Sites panel, the time-to-sunrise/sunset tiles use `getSitePower`'s live event
-  timestamps; Sun/Earth positions, visibility, Earth events, and illumination remain modeled locally.
+- In the Landing Sites panel, the Sun & Earth tiles use the live `sky` response from
+  `getSitePower`. The modeled sky continues to feed the horizon visualization.
 
 ## `getTerrainPatch(lat, lon, { sizeKm, n }) → TerrainPatch`
 
@@ -133,8 +147,8 @@ column 0 = west edge). `heights` is row-major, metres relative to the 1737.4 km 
 ## `getHorizonTerrain(site) → HorizonTerrain` and `getSiteHorizon(site) → Horizon`
 
 First-person terrain for Lunarium (`/lunarium`) plus the **terrain horizon**. The same horizon
-feeds `getSkyModel`, so the 3D view and the Sun & Earth numbers always agree. If the backend
-later provides Sun/Earth data, it should use the same horizon or return it.
+feeds `getSkyModel` for the 3D view. Landing Sites' Sun & Earth tiles use live ephemeris data and
+currently do not include terrain obstruction.
 
 Three square layers on a local east/north tangent plane centred on the site (row 0 = north edge,
 column 0 = west edge, heights in metres relative to the 1737.4 km sphere):

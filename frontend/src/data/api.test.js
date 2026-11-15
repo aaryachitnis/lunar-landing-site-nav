@@ -37,6 +37,17 @@ test('getSitePower requests sun events from the selected time and returns timest
         average_power_sunlit_days_W_m2: 20,
         nearest_sunrise_utc: '2026-01-01T10:00:00Z',
         nearest_sunset_utc: '2026-01-01T22:00:00Z',
+        sky: {
+          sun_altitude_degrees: 19.6,
+          sun_visible: true,
+          earth_altitude_degrees: 30.6,
+          earth_visible: true,
+          nearest_earthrise_utc: '2026-01-02T03:00:00Z',
+          nearest_earthset_utc: '2026-01-02T15:00:00Z',
+          longest_darkness_hours: 14.5,
+          sunlit_fraction: 0.47,
+        },
+        sky_error: null,
       }),
       { headers: { 'content-type': 'application/json' } },
     );
@@ -48,10 +59,23 @@ test('getSitePower requests sun events from the selected time and returns timest
 
   assert.equal(url.pathname, '/api/sites/orig1/metrics');
   assert.equal(url.searchParams.get('events_from'), selectedTime);
+  assert.equal(url.searchParams.get('include_sky'), 'true');
   assert.equal(url.searchParams.get('start'), '2025-12-29T04:30:00.000Z');
   assert.equal(url.searchParams.get('end'), '2026-01-28T04:30:00.000Z');
   assert.equal(power.nearestSunriseUtc, '2026-01-01T10:00:00Z');
   assert.equal(power.nearestSunsetUtc, '2026-01-01T22:00:00Z');
+  assert.deepEqual(power.sky, {
+    sunAltitudeDeg: 19.6,
+    sunVisible: true,
+    earthAltitudeDeg: 30.6,
+    earthVisible: true,
+    nearestEarthriseUtc: '2026-01-02T03:00:00Z',
+    nearestEarthsetUtc: '2026-01-02T15:00:00Z',
+    longestDarknessH: 14.5,
+    sunlitFraction: 0.47,
+  });
+  assert.equal(power.windowDays, 27);
+  assert.equal(power.skyError, null);
 });
 
 test('getPotentialMetrics posts unsaved coordinates to the live metrics endpoint', async () => {
@@ -147,4 +171,32 @@ test('getSitePower preserves null when no sunrise or sunset is in range', async 
 
   assert.equal(power.nearestSunriseUtc, null);
   assert.equal(power.nearestSunsetUtc, null);
+  assert.equal(power.sky, null);
+  assert.equal(power.skyError, null);
+});
+
+test('getSitePower exposes partial sky failure without discarding solar metrics', async () => {
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        site: { id: 'orig3' },
+        start: '2026-01-01T00:00:00Z',
+        end: '2026-01-31T00:00:00Z',
+        instantaneous_power_per_area_W_m2: [0, 100],
+        daily_power_generated_per_area_kWh_per_m2_day: [1],
+        average_power_per_24h_W_m2: 10,
+        average_power_sunlit_days_W_m2: 20,
+        nearest_sunrise_utc: '2026-01-02T03:00:00Z',
+        nearest_sunset_utc: null,
+        sky: null,
+        sky_error: 'Earth ephemeris unavailable',
+      }),
+      { headers: { 'content-type': 'application/json' } },
+    );
+
+  const power = await getSitePower({ id: 'orig3' }, '2026-01-04T00:00:00.000Z');
+
+  assert.equal(power.nearestSunriseUtc, '2026-01-02T03:00:00Z');
+  assert.equal(power.sky, null);
+  assert.equal(power.skyError, 'Earth ephemeris unavailable');
 });

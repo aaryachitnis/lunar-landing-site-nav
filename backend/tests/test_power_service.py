@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import unittest
 from unittest.mock import patch
 
@@ -10,7 +10,10 @@ from services import (
     calculate_beta_angle,
     calculate_energy_per_day,
     calculate_instantaneous_power_per_area,
+    calculate_sky_metrics,
+    fetch_earth_ephemeris,
     fetch_solar_ephemeris,
+    find_nearest_horizon_crossings,
     find_nearest_sunrise_sunset,
 )
 
@@ -63,6 +66,32 @@ class PowerServiceTests(unittest.TestCase):
                 "2026-01-02 00:00",
                 "  ",
             )
+
+    def test_fetch_earth_ephemeris_queries_earth_from_the_lunar_site(self) -> None:
+        from astroquery.jplhorizons import Horizons
+
+        location = {"lat": -89.0, "lon": 12.0, "elevation": 0, "body": 301}
+        with patch("astroquery.jplhorizons.Horizons") as horizons:
+            ephemeris = fetch_earth_ephemeris(
+                location,
+                "2026-01-01 00:00",
+                "2026-01-02 00:00",
+                "4hour",
+            )
+
+        self.assertIs(ephemeris, horizons.return_value.ephemerides.return_value)
+        horizons.assert_called_once_with(
+            id="399",
+            location=location,
+            epochs={
+                "start": "2026-01-01 00:00",
+                "stop": "2026-01-02 00:00",
+                "step": "4hour",
+            },
+        )
+        horizons.return_value.ephemerides.assert_called_once_with(
+            quantities="4,20"
+        )
 
     def test_beta_angle_uses_elevation_and_returns_degrees(self) -> None:
         ephemeris = {
@@ -167,6 +196,112 @@ class PowerServiceTests(unittest.TestCase):
                 },
                 datetime(2026, 1, 2, tzinfo=timezone.utc),
                 datetime(2026, 1, 1, tzinfo=timezone.utc),
+            )
+
+    def test_live_sky_metrics_interpolate_positions_events_and_darkness(self) -> None:
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        start_jd = start.timestamp() / 86_400.0 + 2_440_587.5
+        timestamps = start_jd + np.array([0.0, 0.25, 0.5, 0.75, 1.0])
+        sun = {
+            "EL": [-10.0, -10.0, 20.0, 10.0, -10.0],
+            "datetime_jd": timestamps,
+        }
+        earth = {
+            "EL": [-5.0, 5.0, 15.0, -15.0, -5.0],
+            "datetime_jd": timestamps,
+        }
+
+        result = calculate_sky_metrics(
+            sun,
+            earth,
+            start,
+            start + timedelta(days=1),
+        )
+
+        self.assertAlmostEqual(result.sun_altitude_degrees, -10.0)
+        self.assertFalse(result.sun_visible)
+        self.assertAlmostEqual(result.earth_altitude_degrees, -5.0)
+        self.assertFalse(result.earth_visible)
+        self.assertEqual(
+            result.nearest_earthrise_utc,
+            start + timedelta(hours=3),
+        )
+        self.assertEqual(
+            result.nearest_earthset_utc,
+            start + timedelta(hours=15),
+        )
+        self.assertAlmostEqual(result.longest_darkness_hours, 8.0, places=5)
+        self.assertAlmostEqual(result.sunlit_fraction, 13.0 / 24.0, places=5)
+
+        interpolated = calculate_sky_metrics(
+            sun,
+            earth,
+            start + timedelta(hours=9),
+            start + timedelta(days=1),
+        )
+        self.assertAlmostEqual(interpolated.sun_altitude_degrees, 5.0)
+        self.assertTrue(interpolated.sun_visible)
+        self.assertAlmostEqual(interpolated.earth_altitude_degrees, 10.0)
+        self.assertTrue(interpolated.earth_visible)
+        self.assertIsNone(interpolated.nearest_earthrise_utc)
+        self.assertEqual(
+            interpolated.nearest_earthset_utc,
+            start + timedelta(hours=15),
+        )
+        self.assertAlmostEqual(interpolated.longest_darkness_hours, 3.0, places=5)
+        self.assertAlmostEqual(interpolated.sunlit_fraction, 0.8, places=5)
+
+    def test_live_sky_metrics_handle_an_entirely_dark_interval(self) -> None:
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        start_jd = start.timestamp() / 86_400.0 + 2_440_587.5
+        timestamps = [start_jd, start_jd + 1.0]
+        sun = {"EL": [-10.0, -20.0], "datetime_jd": timestamps}
+        earth = {"EL": [10.0, 20.0], "datetime_jd": timestamps}
+
+        result = calculate_sky_metrics(
+            sun,
+            earth,
+            start,
+            start + timedelta(days=1),
+        )
+
+        self.assertEqual(result.longest_darkness_hours, 24.0)
+        self.assertEqual(result.sunlit_fraction, 0.0)
+        self.assertIsNone(result.nearest_earthrise_utc)
+        self.assertIsNone(result.nearest_earthset_utc)
+
+    def test_earth_horizon_crossings_return_none_when_absent(self) -> None:
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        start_jd = start.timestamp() / 86_400.0 + 2_440_587.5
+        ephemeris = {
+            "EL": [10.0, 20.0],
+            "datetime_jd": [start_jd, start_jd + 1.0],
+        }
+
+        self.assertEqual(
+            find_nearest_horizon_crossings(
+                ephemeris,
+                start,
+                start + timedelta(days=1),
+                "Earth",
+            ),
+            (None, None),
+        )
+
+    def test_live_sky_metrics_reject_ephemerides_without_requested_coverage(self) -> None:
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        start_jd = start.timestamp() / 86_400.0 + 2_440_587.5
+        partial = {
+            "EL": [-10.0, 10.0],
+            "datetime_jd": [start_jd, start_jd + 0.5],
+        }
+
+        with self.assertRaisesRegex(ValueError, "does not cover"):
+            calculate_sky_metrics(
+                partial,
+                partial,
+                start,
+                start + timedelta(days=1),
             )
 
     def test_instantaneous_power_is_zero_below_horizon(self) -> None:

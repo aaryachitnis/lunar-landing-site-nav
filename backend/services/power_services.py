@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
@@ -13,6 +14,8 @@ SECONDS_PER_DAY = 86_400.0
 JOULES_PER_KILOWATT_HOUR = 3_600_000.0
 JULIAN_DATE_UNIX_EPOCH = 2_440_587.5
 JULIAN_DATE_COMPARISON_TOLERANCE = 1e-9
+EARTH_HORIZONS_ID = "399"
+SUN_HORIZONS_ID = "10"
 
 
 class EphemerisData(Protocol):
@@ -27,43 +30,48 @@ class HorizonsRequestError(RuntimeError):
     """Raised when a request to JPL Horizons fails."""
 
 
+@dataclass(frozen=True)
+class SkyMetrics:
+    sun_altitude_degrees: float
+    sun_visible: bool
+    earth_altitude_degrees: float
+    earth_visible: bool
+    nearest_earthrise_utc: datetime | None
+    nearest_earthset_utc: datetime | None
+    longest_darkness_hours: float
+    sunlit_fraction: float
+
+
 def find_nearest_sunrise_sunset(
     ephemeris: EphemerisData,
     start: datetime,
     end: datetime,
 ) -> tuple[datetime | None, datetime | None]:
+    """Find the next sunrise and sunset within the requested interval, in UTC."""
+    return find_nearest_horizon_crossings(ephemeris, start, end, "Solar")
+
+
+def find_nearest_horizon_crossings(
+    ephemeris: EphemerisData,
+    start: datetime,
+    end: datetime,
+    body_name: str = "Body",
+) -> tuple[datetime | None, datetime | None]:
     """Find the next horizon crossings within the requested interval, in UTC.
 
-    Sunrise and sunset are estimated by linearly interpolating the solar
-    elevation between adjacent Horizons samples.
+    Rise and set are estimated by linearly interpolating elevation between
+    adjacent Horizons samples.
     """
-    elevations = _column_as_floats(ephemeris, "EL")
-    timestamps_jd = _column_as_floats(ephemeris, "datetime_jd")
-    if len(elevations) != len(timestamps_jd):
-        raise ValueError("Solar elevations and timestamps must have equal lengths.")
-    if len(timestamps_jd) < 2:
-        raise ValueError("At least two timestamped solar elevations are required.")
-    if np.any(np.diff(timestamps_jd) <= 0):
-        raise ValueError("Timestamps must be strictly increasing.")
-    if np.any((elevations < -90.0) | (elevations > 90.0)):
-        raise ValueError("Sun elevation values must be between -90 and 90 degrees.")
+    elevations, timestamps_jd = _horizon_samples(ephemeris, body_name)
 
-    start_utc = (
-        start.replace(tzinfo=timezone.utc)
-        if start.tzinfo is None
-        else start.astimezone(timezone.utc)
-    )
-    end_utc = (
-        end.replace(tzinfo=timezone.utc)
-        if end.tzinfo is None
-        else end.astimezone(timezone.utc)
-    )
-    if end_utc <= start_utc:
+    start_utc = _as_utc(start)
+    end_utc = _as_utc(end)
+    if end_utc < start_utc:
         raise ValueError("End time must be later than start time.")
-    start_jd = (
-        start_utc.timestamp() / SECONDS_PER_DAY + JULIAN_DATE_UNIX_EPOCH
-    )
-    end_jd = end_utc.timestamp() / SECONDS_PER_DAY + JULIAN_DATE_UNIX_EPOCH
+    if end_utc == start_utc:
+        return None, None
+    start_jd = _datetime_to_julian_date(start_utc)
+    end_jd = _datetime_to_julian_date(end_utc)
     sunrise_jd: float | None = None
     sunset_jd: float | None = None
 
@@ -107,6 +115,138 @@ def find_nearest_sunrise_sunset(
     )
 
 
+def calculate_sky_metrics(
+    sun_ephemeris: EphemerisData,
+    earth_ephemeris: EphemerisData,
+    start: datetime,
+    end: datetime,
+) -> SkyMetrics:
+    """Calculate live apparent sky state and darkness over a UTC interval."""
+    start_utc = _as_utc(start)
+    end_utc = _as_utc(end)
+    if end_utc < start_utc:
+        raise ValueError("End time must not be earlier than start time.")
+
+    sun_elevations, sun_timestamps_jd = _horizon_samples(sun_ephemeris, "Solar")
+    earth_elevations, earth_timestamps_jd = _horizon_samples(earth_ephemeris, "Earth")
+    start_jd = _datetime_to_julian_date(start_utc)
+    end_jd = _datetime_to_julian_date(end_utc)
+    _interpolate_elevation(earth_timestamps_jd, earth_elevations, end_jd, "Earth")
+    sun_altitude = _interpolate_elevation(
+        sun_timestamps_jd, sun_elevations, start_jd, "Solar"
+    )
+    earth_altitude = _interpolate_elevation(
+        earth_timestamps_jd, earth_elevations, start_jd, "Earth"
+    )
+    earthrise, earthset = find_nearest_horizon_crossings(
+        earth_ephemeris, start_utc, end_utc, "Earth"
+    )
+    longest_darkness_seconds, total_darkness_seconds = _darkness_durations(
+        sun_timestamps_jd, sun_elevations, start_jd, end_jd
+    )
+    window_seconds = (end_jd - start_jd) * SECONDS_PER_DAY
+    sunlit_fraction = (
+        1.0 - total_darkness_seconds / window_seconds
+        if window_seconds > 0
+        else float(sun_altitude > 0.0)
+    )
+
+    return SkyMetrics(
+        sun_altitude_degrees=sun_altitude,
+        sun_visible=sun_altitude > 0.0,
+        earth_altitude_degrees=earth_altitude,
+        earth_visible=earth_altitude > 0.0,
+        nearest_earthrise_utc=earthrise,
+        nearest_earthset_utc=earthset,
+        longest_darkness_hours=longest_darkness_seconds / 3600.0,
+        sunlit_fraction=min(1.0, max(0.0, sunlit_fraction)),
+    )
+
+
+def _horizon_samples(
+    ephemeris: EphemerisData,
+    body_name: str,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    elevations = _column_as_floats(ephemeris, "EL")
+    timestamps_jd = _column_as_floats(ephemeris, "datetime_jd")
+    if len(elevations) != len(timestamps_jd):
+        raise ValueError(f"{body_name} elevations and timestamps must have equal lengths.")
+    if len(timestamps_jd) < 2:
+        raise ValueError(
+            f"At least two timestamped {body_name.lower()} elevations are required."
+        )
+    if np.any(np.diff(timestamps_jd) <= 0):
+        raise ValueError("Timestamps must be strictly increasing.")
+    if np.any((elevations < -90.0) | (elevations > 90.0)):
+        raise ValueError(f"{body_name} elevation values must be between -90 and 90 degrees.")
+    return elevations, timestamps_jd
+
+
+def _interpolate_elevation(
+    timestamps_jd: NDArray[np.float64],
+    elevations: NDArray[np.float64],
+    timestamp_jd: float,
+    body_name: str,
+) -> float:
+    if (
+        timestamp_jd < timestamps_jd[0] - JULIAN_DATE_COMPARISON_TOLERANCE
+        or timestamp_jd > timestamps_jd[-1] + JULIAN_DATE_COMPARISON_TOLERANCE
+    ):
+        raise ValueError(f"{body_name} ephemeris does not cover the requested time range.")
+    return float(np.interp(timestamp_jd, timestamps_jd, elevations))
+
+
+def _darkness_durations(
+    timestamps_jd: NDArray[np.float64],
+    elevations: NDArray[np.float64],
+    start_jd: float,
+    end_jd: float,
+) -> tuple[float, float]:
+    if end_jd <= start_jd:
+        return 0.0, 0.0
+    _interpolate_elevation(timestamps_jd, elevations, start_jd, "Solar")
+    _interpolate_elevation(timestamps_jd, elevations, end_jd, "Solar")
+    internal_timestamps = timestamps_jd[
+        (timestamps_jd > start_jd) & (timestamps_jd < end_jd)
+    ]
+    times = np.concatenate(([start_jd], internal_timestamps, [end_jd]))
+    values = np.interp(times, timestamps_jd, elevations)
+    dark_intervals: list[tuple[float, float]] = []
+
+    for index in range(1, len(times)):
+        left_time, right_time = times[index - 1], times[index]
+        left_elevation, right_elevation = values[index - 1], values[index]
+        if left_elevation <= 0.0 and right_elevation <= 0.0:
+            interval = (left_time, right_time)
+        elif left_elevation <= 0.0 < right_elevation:
+            crossing = _interpolate_horizon_crossing(
+                left_time, right_time, left_elevation, right_elevation
+            )
+            interval = (left_time, crossing)
+        elif left_elevation > 0.0 >= right_elevation:
+            crossing = _interpolate_horizon_crossing(
+                left_time, right_time, left_elevation, right_elevation
+            )
+            interval = (crossing, right_time)
+        else:
+            continue
+
+        if (
+            dark_intervals
+            and interval[0]
+            <= dark_intervals[-1][1] + JULIAN_DATE_COMPARISON_TOLERANCE
+        ):
+            dark_intervals[-1] = (dark_intervals[-1][0], interval[1])
+        else:
+            dark_intervals.append(interval)
+
+    durations = [
+        (interval_end - interval_start) * SECONDS_PER_DAY
+        for interval_start, interval_end in dark_intervals
+    ]
+    return max(durations, default=0.0), sum(durations)
+
+
 def _interpolate_horizon_crossing(
     start_jd: float,
     end_jd: float,
@@ -115,6 +255,16 @@ def _interpolate_horizon_crossing(
 ) -> float:
     fraction = -start_elevation / (end_elevation - start_elevation)
     return start_jd + fraction * (end_jd - start_jd)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _datetime_to_julian_date(value: datetime) -> float:
+    return value.timestamp() / SECONDS_PER_DAY + JULIAN_DATE_UNIX_EPOCH
 
 
 def _julian_date_to_utc(julian_date: float) -> datetime:
@@ -133,6 +283,26 @@ def fetch_solar_ephemeris(
     step: str,
 ) -> EphemerisData:
     """Fetch solar ephemeris samples from JPL Horizons for a lunar location."""
+    return _fetch_body_ephemeris(SUN_HORIZONS_ID, location, start, end, step)
+
+
+def fetch_earth_ephemeris(
+    location: HorizonsLocation,
+    start: str,
+    end: str,
+    step: str,
+) -> EphemerisData:
+    """Fetch Earth ephemeris samples from JPL Horizons for a lunar location."""
+    return _fetch_body_ephemeris(EARTH_HORIZONS_ID, location, start, end, step)
+
+
+def _fetch_body_ephemeris(
+    target_id: str,
+    location: HorizonsLocation,
+    start: str,
+    end: str,
+    step: str,
+) -> EphemerisData:
     if not start or not end:
         raise ValueError("Start and end times are required.")
     if not step or not step.strip():
@@ -146,12 +316,12 @@ def fetch_solar_ephemeris(
         ) from exc
 
     try:
-        sun = Horizons(
-            id="10",
+        target = Horizons(
+            id=target_id,
             location=location,
             epochs={"start": start, "stop": end, "step": step},
         )
-        return sun.ephemerides(quantities="4,20")
+        return target.ephemerides(quantities="4,20")
     except RequestException as exc:
         raise HorizonsRequestError("The JPL Horizons request failed.") from exc
 

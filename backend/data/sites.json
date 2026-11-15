@@ -98,5 +98,15 @@
     ],
     "desc": "",
     "agency": "Custom"
+  },
+  {
+    "id": "custom-e81bbf8864a44bcab526bd061a03276d",
+    "name": "Test",
+    "loc": [
+      45.0,
+      45.0
+    ],
+    "desc": "",
+    "agency": "Custom"
   }
 ]

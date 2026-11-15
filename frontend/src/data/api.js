@@ -1,6 +1,6 @@
 // The only module components and hooks import data from. Return shapes are in SCHEMA.md.
 //
-// Live (FastAPI backend):  getSites, getSitePower
+// Live (FastAPI backend):  getSites, getSitePower (power and optional sky metrics)
 // Modeled in the browser:  getSkyModel (Sun/Earth positions), getLunariumSites
 // Terrain (NASA LOLA):     getTerrainPatch, getHorizonTerrain, getSiteHorizon
 // Playground:              calculatePotential (live backend metrics, mock on errors)
@@ -86,6 +86,7 @@ export function getSitePower(site, dateISO) {
       end,
       step: `${stepHours}hour`,
       events_from: new Date(t0).toISOString(),
+      include_sky: 'true',
     });
     // Samples are evenly spaced from `start`; the response carries values only.
     const startMs = Date.parse(res.start);
@@ -110,6 +111,20 @@ export function getSitePower(site, dateISO) {
       avgSunlitDaysWPerM2: res.average_power_sunlit_days_W_m2,
       nearestSunriseUtc: res.nearest_sunrise_utc,
       nearestSunsetUtc: res.nearest_sunset_utc,
+      sky: res.sky
+        ? {
+            sunAltitudeDeg: res.sky.sun_altitude_degrees,
+            sunVisible: res.sky.sun_visible,
+            earthAltitudeDeg: res.sky.earth_altitude_degrees,
+            earthVisible: res.sky.earth_visible,
+            nearestEarthriseUtc: res.sky.nearest_earthrise_utc,
+            nearestEarthsetUtc: res.sky.nearest_earthset_utc,
+            longestDarknessH: res.sky.longest_darkness_hours,
+            sunlitFraction: res.sky.sunlit_fraction,
+          }
+        : null,
+      skyError: res.sky_error ?? null,
+      windowDays: daysAfter,
       source: 'JPL Horizons via backend',
     };
   });
@@ -123,11 +138,11 @@ function valueAt(series, t) {
   return a.wPerM2 + ((b.wPerM2 - a.wPerM2) * (t - a.t)) / (b.t - a.t);
 }
 
-// ── Sun & Earth (mock) ─────────────────────────────────────────────────────
+// ── Sun & Earth (modeled horizon visualization) ────────────────────────────
 
 /**
- * Sun and Earth positions, visibility and rise/set times from a simplified geometric model
- * run in the browser. Mocked until the backend provides Sun/Earth data.
+ * Sun and Earth geometry for the terrain-aware horizon visualization.
+ * Site-panel metric tiles use live ephemerides from getSitePower instead.
  * @returns {Promise<SkyModel>}
  */
 export async function getSkyModel(site, dateISO) {

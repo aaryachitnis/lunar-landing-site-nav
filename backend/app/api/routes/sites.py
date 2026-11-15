@@ -8,6 +8,7 @@ from app.dependencies import get_app_settings
 from core.models import (
     CustomMetricsRequest,
     PowerMetricsResponse,
+    SkyMetricsResponse,
     SiteCreateRequest,
     SiteSummary,
 )
@@ -24,6 +25,8 @@ from services import (
     HorizonsUnavailableError,
     calculate_energy_per_day,
     calculate_instantaneous_power_per_area,
+    calculate_sky_metrics,
+    fetch_earth_ephemeris,
     fetch_solar_ephemeris,
     find_nearest_sunrise_sunset,
 )
@@ -93,7 +96,7 @@ def _parse_metrics_window(
     if not start_datetime <= events_start_datetime <= end_datetime:
         raise HTTPException(
             status_code=400,
-            detail="Sunrise/sunset search start must be within the requested range.",
+            detail="Event search start must be within the requested range.",
         )
     step = step.strip()
     if not step:
@@ -109,6 +112,7 @@ def _calculate_metrics(
     events_start_datetime: datetime,
     step: str,
     settings: Settings,
+    include_sky: bool = False,
 ) -> PowerMetricsResponse:
     start_horizons = start_datetime.strftime("%Y-%m-%d %H:%M")
     end_horizons = end_datetime.strftime("%Y-%m-%d %H:%M")
@@ -123,6 +127,21 @@ def _calculate_metrics(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except HorizonsRequestError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    earth_ephemeris = None
+    sky_error = None
+    if include_sky:
+        try:
+            earth_ephemeris = fetch_earth_ephemeris(
+                location,
+                start_horizons,
+                end_horizons,
+                step,
+            )
+        except HorizonsUnavailableError as exc:
+            sky_error = str(exc)
+        except HorizonsRequestError as exc:
+            sky_error = str(exc)
 
     try:
         instantaneous_power = calculate_instantaneous_power_per_area(
@@ -142,6 +161,18 @@ def _calculate_metrics(
             detail=f"Invalid ephemeris data returned by Horizons: {exc}",
         ) from exc
 
+    sky = None
+    if earth_ephemeris is not None:
+        try:
+            sky = calculate_sky_metrics(
+                ephemeris,
+                earth_ephemeris,
+                events_start_datetime,
+                end_datetime,
+            )
+        except ValueError as exc:
+            sky_error = f"Invalid ephemeris data returned by Horizons: {exc}"
+
     duration_hours = (end_datetime - start_datetime).total_seconds() / 3600.0
     average_power_24h = (
         sum(daily_energy) * 1000.0 / duration_hours if duration_hours > 0 else 0.0
@@ -160,6 +191,29 @@ def _calculate_metrics(
         step=step,
         nearest_sunrise_utc=format_utc(sunrise) if sunrise is not None else None,
         nearest_sunset_utc=format_utc(sunset) if sunset is not None else None,
+        sky=(
+            SkyMetricsResponse(
+                sun_altitude_degrees=sky.sun_altitude_degrees,
+                sun_visible=sky.sun_visible,
+                earth_altitude_degrees=sky.earth_altitude_degrees,
+                earth_visible=sky.earth_visible,
+                nearest_earthrise_utc=(
+                    format_utc(sky.nearest_earthrise_utc)
+                    if sky.nearest_earthrise_utc is not None
+                    else None
+                ),
+                nearest_earthset_utc=(
+                    format_utc(sky.nearest_earthset_utc)
+                    if sky.nearest_earthset_utc is not None
+                    else None
+                ),
+                longest_darkness_hours=sky.longest_darkness_hours,
+                sunlit_fraction=sky.sunlit_fraction,
+            )
+            if sky is not None
+            else None
+        ),
+        sky_error=sky_error,
         instantaneous_power_per_area_W_m2=[
             float(value) for value in instantaneous_power
         ],
@@ -183,8 +237,12 @@ def get_site_metrics(
     settings: Settings = Depends(get_app_settings),
     events_from: Annotated[
         str | None,
-        Query(description="Start time for sunrise/sunset search; defaults to start."),
+        Query(description="Start time for event search and sky state; defaults to start."),
     ] = None,
+    include_sky: Annotated[
+        bool,
+        Query(description="Include live Sun/Earth metrics and Earth rise/set times."),
+    ] = False,
 ) -> PowerMetricsResponse:
     site = resolve_site(site_id)
     start_datetime, end_datetime, events_start_datetime, step = _parse_metrics_window(
@@ -202,6 +260,7 @@ def get_site_metrics(
         events_start_datetime,
         step,
         settings,
+        include_sky,
     )
 
 
