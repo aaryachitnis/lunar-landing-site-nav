@@ -41,6 +41,14 @@
 }
 .pg-submit:hover:not(:disabled) { background: var(--accent); color: #000; box-shadow: var(--glow); }
 .pg-submit:disabled { opacity: 0.6; cursor: progress; }
+.pg-save-site { display: flex; flex-direction: column; gap: 7px; }
+.pg-add-site {
+  padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: var(--radius);
+  background: var(--surface-2); color: var(--text-secondary);
+  font-family: var(--display); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em;
+}
+.pg-add-site:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pg-add-site:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ── Right: result cards ── */
 .pg-right { min-width: 0; }

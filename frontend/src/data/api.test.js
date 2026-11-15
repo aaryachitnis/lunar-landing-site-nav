@@ -1,13 +1,26 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 
-import { getSitePower } from './api.js';
+import { addSite, getPotentialMetrics, getSitePower, getSites } from './api.js';
 
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
+
+const metricsResponse = {
+  site: { id: 'custom-location', name: 'Custom location', loc: [-87, 43], lat: -87, lon: 43 },
+  start: '2026-01-01T00:00:00Z',
+  end: '2026-01-02T00:00:00Z',
+  step: '4hour',
+  instantaneous_power_per_area_W_m2: [0, 100, 100, 0],
+  daily_power_generated_per_area_kWh_per_m2_day: [1.2],
+  average_power_per_24h_W_m2: 50,
+  average_power_sunlit_days_W_m2: 50,
+  nearest_sunrise_utc: '2026-01-01T03:00:00Z',
+  nearest_sunset_utc: '2026-01-01T21:00:00Z',
+};
 
 test('getSitePower requests sun events from the selected time and returns timestamps', async () => {
   let requestUrl;
@@ -39,6 +52,78 @@ test('getSitePower requests sun events from the selected time and returns timest
   assert.equal(url.searchParams.get('end'), '2026-01-28T04:30:00.000Z');
   assert.equal(power.nearestSunriseUtc, '2026-01-01T10:00:00Z');
   assert.equal(power.nearestSunsetUtc, '2026-01-01T22:00:00Z');
+});
+
+test('getPotentialMetrics posts unsaved coordinates to the live metrics endpoint', async () => {
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    const requestUrl = new URL(String(url), 'http://localhost');
+    requests.push({ requestUrl, options });
+    const body = requestUrl.pathname === '/api/sites'
+      ? [{ id: 'orig1', name: 'Apollo 11', lat: 0.67, lon: 23.47, desc: '', agency: 'NASA' }]
+      : metricsResponse;
+    return new Response(JSON.stringify(body), {
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const result = await getPotentialMetrics({
+    lat: -87,
+    lon: 43,
+    start: '2026-01-01T00:00:00Z',
+    end: '2026-01-02T00:00:00Z',
+    step: '4hour',
+  });
+
+  assert.equal(result.dataSource, 'live');
+  assert.equal(result.site, null);
+  assert.equal(result.response.site.id, 'custom-location');
+  assert.equal(result.response.nearest_sunrise_utc, '2026-01-01T03:00:00Z');
+  const metricsRequest = requests.find(({ requestUrl }) => requestUrl.pathname === '/api/sites/metrics');
+  assert.equal(metricsRequest.options.method, 'POST');
+  assert.deepEqual(JSON.parse(metricsRequest.options.body), {
+    lat: -87,
+    lon: 43,
+    start: '2026-01-01T00:00:00Z',
+    end: '2026-01-02T00:00:00Z',
+    step: '4hour',
+  });
+});
+
+test('addSite posts a location explicitly to the persistent catalog', async () => {
+  const requests = [];
+  const created = {
+    id: 'custom-123',
+    name: 'Shackleton Ridge',
+    loc: [-89, 25],
+    lat: -89,
+    lon: 25,
+    desc: '',
+    agency: 'Custom',
+  };
+  globalThis.fetch = async (url, options = {}) => {
+    const request = { url: String(url), options };
+    requests.push(request);
+    if (options.method !== 'POST') return new Response(JSON.stringify([created]));
+    return new Response(
+      JSON.stringify(created),
+      { headers: { 'content-type': 'application/json' } },
+    );
+  };
+
+  const site = await addSite({ name: 'Shackleton Ridge', lat: -89, lon: 25 });
+  const sites = await getSites();
+
+  const saveRequest = requests.find(({ options }) => options.method === 'POST');
+  assert.equal(new URL(saveRequest.url, 'http://localhost').pathname, '/api/sites');
+  assert.deepEqual(JSON.parse(saveRequest.options.body), {
+    name: 'Shackleton Ridge',
+    lat: -89,
+    lon: 25,
+  });
+  assert.equal(site.id, 'custom-123');
+  assert.equal(site.fullName, 'Shackleton Ridge');
+  assert.equal(sites.some((saved) => saved.id === 'custom-123'), true);
 });
 
 test('getSitePower preserves null when no sunrise or sunset is in range', async () => {

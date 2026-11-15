@@ -1,0 +1,102 @@
+[
+  {
+    "id": "orig1",
+    "name": "Artemis 3 (Amundsen)",
+    "loc": [
+      -84.2287,
+      69.44396
+    ],
+    "desc": "Proposed lunar south polar landing region near Amundsen crater. Offers access to ancient highland terrain and nearby permanently shadowed regions of scientific interest.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig2",
+    "name": "Apollo 17 (Taurus-Littrow)",
+    "loc": [
+      20.19032,
+      30.77314
+    ],
+    "desc": "Final Apollo lunar landing site, situated in the Taurus-Littrow valley between mountainous highlands and volcanic mare terrain. Selected to investigate highland materials and volcanic deposits.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig3",
+    "name": "Apollo 11 (Mare Tranquillitatis)",
+    "loc": [
+      0.67138,
+      23.47398
+    ],
+    "desc": "Historic first crewed lunar landing site, located within Mare Tranquillitatis. A relatively smooth mare basalt plain selected to demonstrate the feasibility of a crewed lunar landing.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig4",
+    "name": "Apollo 14 (Fra Mauro)",
+    "loc": [
+      -3.6452,
+      -17.4715
+    ],
+    "desc": "Located in the Fra Mauro highlands, containing material associated with the Imbrium impact basin. Selected to investigate lunar crustal materials and impact ejecta.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig5",
+    "name": "Apollo 15 (Hadley-Apennine)",
+    "loc": [
+      26.13214,
+      3.6338
+    ],
+    "desc": "Located near Hadley Rille and the Apennine Mountains, providing access to mountainous highland terrain, volcanic plains and a prominent lunar geological rille.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig6",
+    "name": "Apollo 12 (Oceanus Procellarum)",
+    "loc": [
+      -3.01234,
+      -23.42159
+    ],
+    "desc": "Located in Oceanus Procellarum (Ocean of Storms), a large lunar mare region. Selected to investigate mare basalt deposits and demonstrate precision landing capabilities.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig7",
+    "name": "Apollo 16 (Descartes Highlands)",
+    "loc": [
+      -8.99123,
+      15.51441
+    ],
+    "desc": "Located in the Descartes Highlands, an elevated lunar region investigated for ancient crustal materials and geological history, including highland rocks and impact-related deposits.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig8",
+    "name": "Artemis 3 (Faustini Rim A)",
+    "loc": [
+      -87.90019,
+      89.69908
+    ],
+    "desc": "Proposed lunar south polar landing region near the rim of Faustini crater. Offers access to polar highland terrain and proximity to permanently shadowed regions that may contain water ice.",
+    "agency": "NASA"
+  },
+  {
+    "id": "orig9",
+    "name": "Artemis 3 (Haworth)",
+    "loc": [
+      -86.77509,
+      -23.13639
+    ],
+    "desc": "Proposed lunar south polar landing region associated with Haworth crater. Offers opportunities to investigate ancient highland terrain and potentially volatile-bearing permanently shadowed regions.",
+    "agency": "NASA"
+  },
+  {
+    "id": "custom-e533e9e805d84c359a5f8f6cdcc03ff0",
+    "name": "Lunar Null Island",
+    "loc": [
+      0.0,
+      0.0
+    ],
+    "desc": "",
+    "agency": "Custom"
+  }
+]

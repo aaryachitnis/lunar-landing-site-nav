@@ -1,3 +1,21 @@
-from .sites import SITES, SiteCoordinates, SiteRecord, find_site_record
+from .sites import (
+    SITES,
+    DuplicateSiteError,
+    SiteCatalogError,
+    SiteCoordinates,
+    SiteRecord,
+    add_site_record,
+    find_site_record,
+    load_site_records,
+)
 
-__all__ = ["SITES", "SiteCoordinates", "SiteRecord", "find_site_record"]
+__all__ = [
+    "SITES",
+    "DuplicateSiteError",
+    "SiteCatalogError",
+    "SiteCoordinates",
+    "SiteRecord",
+    "add_site_record",
+    "find_site_record",
+    "load_site_records",
+]

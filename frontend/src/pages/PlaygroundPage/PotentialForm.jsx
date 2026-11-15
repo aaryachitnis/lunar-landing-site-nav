@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import TimePicker from '../../components/TimePicker/TimePicker.jsx';
-import { ENGINE_SETTINGS, ENGINE_STEPS, matchBackendSite } from '../../data/api.js';
+import { addSite, ENGINE_SETTINGS, ENGINE_STEPS, matchBackendSite } from '../../data/api.js';
 import { useSites } from '../../hooks/useSites.js';
 
 const TILE_SIZES = [20, 40, 80];
@@ -7,17 +8,66 @@ const TILE_SIZES = [20, 40, 80];
 /**
  * Left column of the sketch: coordinates, other parameters and "Calculate potential".
  * Values are kept as strings so inputs can be mid-edit; validation happens in validateForm().
- * @param {{ values: object, errors: object, onChange: (patch: object) => void, onSubmit: () => void, busy: boolean }} props
+ * @param {{ values: object, errors: object, onChange: (patch: object) => void, onSubmit: () => void, busy: boolean, canAddSite: boolean }} props
  */
-export default function PotentialForm({ values, errors, onChange, onSubmit, busy }) {
-  // Backend sites get live power; anything else uses the mock engine.
-  const backend = useSites();
-  const match = matchBackendSite(backend.data, Number(values.lat), Number(values.lon));
-  const source = backend.error
-    ? { live: false, text: 'Backend offline: power will be mocked' }
-    : match
-      ? { live: true, text: `Live data: ${match.name}` }
-      : { live: false, text: 'Not a backend site: power will be mocked' };
+export default function PotentialForm({
+  values,
+  errors,
+  onChange,
+  onSubmit,
+  busy,
+  canAddSite,
+}) {
+  const [siteRefreshKey, setSiteRefreshKey] = useState(0);
+  const [saveState, setSaveState] = useState({ busy: false, error: null, message: null });
+  const backend = useSites(siteRefreshKey);
+  const latitude = Number(values.lat);
+  const rawLongitude = Number(values.lon);
+  const longitude = rawLongitude > 180 ? rawLongitude - 360 : rawLongitude;
+  const hasCoordinates = String(values.lat).trim() !== '' && String(values.lon).trim() !== '';
+  const match = hasCoordinates
+    ? matchBackendSite(backend.data, latitude, longitude)
+    : null;
+  const source = match
+    ? { live: true, text: `Live metrics: ${match.name}` }
+    : {
+        live: true,
+        text: 'Custom coordinates use live backend metrics; mock fallback if unavailable',
+      };
+
+  const saveCustomSite = async () => {
+    const name = String(values.siteName ?? '').trim();
+    const errors = [];
+    if (!name) errors.push('Enter a name for this site.');
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      errors.push('Enter a latitude from -90 to 90.');
+    }
+    if (!Number.isFinite(rawLongitude) || rawLongitude < -180 || rawLongitude > 360) {
+      errors.push('Enter a longitude from -180 to 180 (or 0 to 360).');
+    }
+    if (match) errors.push('These coordinates are already in the site list.');
+    if (errors.length) {
+      setSaveState({ busy: false, error: errors.join(' '), message: null });
+      return;
+    }
+
+    setSaveState({ busy: true, error: null, message: null });
+    try {
+      const saved = await addSite({ name, lat: latitude, lon: longitude });
+      setSiteRefreshKey((key) => key + 1);
+      setSaveState({
+        busy: false,
+        error: null,
+        message: `Added ${saved.fullName} to the site list.`,
+      });
+    } catch (error) {
+      setSaveState({
+        busy: false,
+        error: String(error.message ?? error),
+        message: null,
+      });
+    }
+  };
 
   const field = (name, label, props = {}) => (
     <label className="pg-field">
@@ -48,7 +98,7 @@ export default function PotentialForm({ values, errors, onChange, onSubmit, busy
       </div>
 
       <label className="pg-field">
-        <span className="pg-label">Backend site (live data)</span>
+        <span className="pg-label">Saved site (live data)</span>
         <select
           className="pg-input"
           value={match?.id ?? ''}
@@ -58,7 +108,7 @@ export default function PotentialForm({ values, errors, onChange, onSubmit, busy
             if (s) onChange({ lat: String(s.lat), lon: String(s.lon) });
           }}
         >
-          <option value="">{backend.loading ? 'Loading sites…' : backend.error ? 'Backend unavailable' : 'Custom coordinates'}</option>
+          <option value="">{backend.loading ? 'Loading sites…' : 'Custom coordinates'}</option>
           {backend.data?.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -115,6 +165,24 @@ export default function PotentialForm({ values, errors, onChange, onSubmit, busy
       <button className="pg-submit" type="submit" disabled={busy}>
         {busy ? 'Calculating…' : 'Calculate potential'}
       </button>
+
+      <div className="pg-save-site">
+        {field('siteName', 'Add custom location to site list', { placeholder: 'Site name' })}
+        <button
+          className="pg-add-site"
+          type="button"
+          disabled={saveState.busy || busy || !canAddSite || !!match}
+          onClick={saveCustomSite}
+        >
+          {saveState.busy ? 'Adding…' : match ? 'Already saved' : 'Add to site list'}
+        </button>
+        {!canAddSite && !match && (
+          <p className="pg-hint">Calculate potential for these coordinates before saving.</p>
+        )}
+        {saveState.error && <p className="field-error" role="alert">{saveState.error}</p>}
+        {saveState.message && <p className="pg-hint" role="status">{saveState.message}</p>}
+        {backend.error && <p className="pg-hint">Site list could not be loaded; saving requires the backend.</p>}
+      </div>
     </form>
   );
 }

@@ -5,11 +5,11 @@ export const API_BASE = (import.meta.env?.VITE_API_BASE ?? '/api').replace(/\/$/
 
 export class BackendError extends Error {}
 
-export async function fetchJson(path, params) {
+export async function fetchJson(path, params, options) {
   const query = params ? `?${new URLSearchParams(params)}` : '';
   let res;
   try {
-    res = await fetch(`${API_BASE}${path}${query}`);
+    res = await fetch(`${API_BASE}${path}${query}`, options);
   } catch {
     throw new BackendError(`Can't reach the backend at ${API_BASE}. Is it running?`);
   }
@@ -20,4 +20,13 @@ export async function fetchJson(path, params) {
     throw new BackendError(typeof body.detail === 'string' ? body.detail : `Backend error ${res.status}`);
   }
   return body;
+}
+
+/** Send a JSON request body and return the decoded backend response. */
+export function postJson(path, body) {
+  return fetchJson(path, null, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }

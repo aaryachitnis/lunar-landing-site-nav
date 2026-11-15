@@ -2,8 +2,8 @@ import { getLunariumSites, getSites } from '../data/api.js';
 import { useAsync } from './useAsync.js';
 
 /** Sites from the backend. */
-export function useSites() {
-  return useAsync(() => getSites(), []);
+export function useSites(refreshKey = 0) {
+  return useAsync(() => getSites(), [refreshKey]);
 }
 
 /** Lunarium's site list. */
