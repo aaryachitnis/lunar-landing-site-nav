@@ -15,6 +15,9 @@ const SUN_RADIUS_DEG = 0.266;
 const EARTH_RADIUS_DEG = 0.95;
 const SKY_DIST = 10;
 const SUN_INTENSITY = 3.2;
+// On phones the true-size disks are only a few pixels across, so they are drawn larger
+// (display only: visibility, labels and power still use the true 0.53° / 1.9° disks).
+const MOBILE_BODY_SCALE = { sun: 3, earth: 2 };
 const REGOLITH = new THREE.Color('#9b978f');
 
 /** Unit direction (scene frame) for azimuth (clockwise from north) and elevation, degrees. */
@@ -436,7 +439,9 @@ export class HorizonScene {
     this.sunGlow = new THREE.Sprite(
       new THREE.SpriteMaterial({ map: glowTexture(), color: '#ffffff', blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }),
     );
-    this.sunGlow.scale.setScalar(SKY_DIST * Math.tan(9 * D2R));
+    const bodyScale = this.mobile ? MOBILE_BODY_SCALE : { sun: 1, earth: 1 };
+    this.sunDisk.scale.setScalar(bodyScale.sun);
+    this.sunGlow.scale.setScalar(SKY_DIST * Math.tan(9 * D2R) * Math.sqrt(bodyScale.sun));
     this.sky.add(this.sunDisk, this.sunGlow);
 
     this.earthUniforms = { map: { value: makeEarthTexture(mulberry32(7)) }, sunDir: { value: new THREE.Vector3(1, 0, 0) } };
@@ -450,6 +455,7 @@ export class HorizonScene {
     });
     this.earth = new THREE.Mesh(new THREE.SphereGeometry(SKY_DIST * Math.tan(EARTH_RADIUS_DEG * D2R), 48, 24), earthMat);
     this.earth.rotation.z = 0.4;
+    this.earth.scale.setScalar(bodyScale.earth);
     this.sky.add(this.earth);
   }
 

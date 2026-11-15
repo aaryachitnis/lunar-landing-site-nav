@@ -54,7 +54,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
           <p className="panel-sub">
             {site.agency} · {site.notes}
           </p>
-          <Link className="stand-here" to={`/horizon?site=${encodeURIComponent(site.id)}&t=${encodeURIComponent(time)}`}>
+          <Link className="stand-here" to={`/lunarium?site=${encodeURIComponent(site.id)}&t=${encodeURIComponent(time)}`}>
             🧑‍🚀 Stand here · look at the horizon →
           </Link>
         </div>

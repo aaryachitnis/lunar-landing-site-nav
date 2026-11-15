@@ -21,7 +21,7 @@ function useIsNarrow() {
   return narrow;
 }
 
-/** Home route: God's-eye globe of candidate landing sites. */
+/** Home route ("Landing Sites" tab): god's-eye globe of candidate landing sites. */
 export default function GlobePage() {
   const { data: fetchedSites, loading } = useSites();
   const { siteId, time, selectSite, clearSite, setTime } = useSelectedSite();

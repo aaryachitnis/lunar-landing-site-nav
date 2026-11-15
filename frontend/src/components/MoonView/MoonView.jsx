@@ -6,7 +6,7 @@ import { SITE_CATEGORIES } from '../../data/mock/sites.js';
 import './MoonView.css';
 
 /**
- * God's-eye globe with HTML site markers.
+ * Landing Sites globe (god's-eye view) with HTML site markers.
  * @param {{ sites: object[], selectedSite: object|null, onSelect: (id) => void, insets: {left:number,right:number} }} props
  */
 export default function MoonView({ sites, selectedSite, onSelect, insets }) {
