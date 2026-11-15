@@ -3,6 +3,7 @@
 // Live (FastAPI backend):  getSites, getSitePower
 // Mocked in the browser:   getSkyModel (Sun/Earth positions), getLunariumSites
 // Terrain (NASA LOLA):     getTerrainPatch, getHorizonTerrain, getSiteHorizon
+// Playground:              calculatePotential (live for backend sites, mock otherwise)
 
 import { fetchJson } from './backend.js';
 import { describeSite } from './siteCatalog.js';
@@ -12,6 +13,7 @@ import { loadElevation } from './elevation.js';
 import { samplePatch } from './terrainPatch.js';
 import { assembleHorizonTerrain, fetchPack, fetchPackMeta } from './horizonTerrain.js';
 import { TERRAIN_BASE } from '../scene/config.js';
+import { ENGINE_SETTINGS, ENGINE_STEPS, mockEnginePotential } from './mock/engine.js';
 
 const HOUR_MS = 3.6e6;
 const DAY_MS = 24 * HOUR_MS;
@@ -154,3 +156,106 @@ export async function getTerrainPatch(lat, lon, opts = {}) {
   const grid = await loadElevation();
   return samplePatch(grid, lat, lon, opts);
 }
+
+// ── Playground (/playground) ───────────────────────────────────────────────
+//
+// Power for any coordinate. The backend only computes power for its own catalogue
+// (GET /sites/{id}/metrics), so:
+//   • coordinates on a backend site  → live JPL Horizons data from the backend
+//   • any other coordinates          → the mock engine (mock/engine.js), same response shape
+//   • backend unreachable / errors   → the mock, with the reason attached
+// When the backend gains a coordinate endpoint (e.g. GET /potential?lat&lon&start&end&step),
+// replace the mock branch in fetchEnginePotential with fetchJson('/potential', { lat, lon, start, end, step }).
+
+// Within ~0.3 km of a backend site counts as "that site" (catalogue coordinates have 4–5 decimals).
+const PLAYGROUND_MATCH_DEG = 0.01;
+const playgroundPowerCache = new Map();
+
+/** The site in `sites` at these coordinates, or null. Pure, so the form can show live/mock status. */
+export function matchBackendSite(sites, lat, lon) {
+  if (!sites || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return sites.find((s) => Math.abs(s.lat - lat) < PLAYGROUND_MATCH_DEG && Math.abs(s.lon - lon) < PLAYGROUND_MATCH_DEG) ?? null;
+}
+
+/** { site } for the backend site at these coordinates (site may be null), or { error } if unreachable. */
+async function findBackendSite(lat, lon) {
+  try {
+    return { site: matchBackendSite(await getSites(), lat, lon) };
+  } catch (error) {
+    return { site: null, error };
+  }
+}
+
+/**
+ * Engine call for the Playground. Returns the backend's PowerMetricsResponse (snake_case) plus
+ * where it came from: { dataSource: 'live' | 'mock', site, reason, response }.
+ */
+async function fetchEnginePotential({ lat, lon, start, end, step }) {
+  const { site, error } = await findBackendSite(lat, lon);
+  if (error) {
+    return {
+      dataSource: 'mock',
+      site: null,
+      reason: `${error.message} Showing mock values.`,
+      response: mockEnginePotential({ lat, lon, start, end, step }),
+    };
+  }
+  if (site) {
+    try {
+      const response = await cached(playgroundPowerCache, `${site.id}|${start}|${end}|${step}`, () =>
+        fetchJson(`/sites/${encodeURIComponent(site.id)}/metrics`, { start, end, step }),
+      );
+      return { dataSource: 'live', site, reason: null, response };
+    } catch (err) {
+      return {
+        dataSource: 'mock',
+        site,
+        reason: `Live data failed (${err.message}). Showing mock values.`,
+        response: mockEnginePotential({ lat, lon, start, end, step }),
+      };
+    }
+  }
+  return {
+    dataSource: 'mock',
+    site: null,
+    reason: 'The backend only computes power for its catalogue sites, so these coordinates use the mock engine.',
+    response: mockEnginePotential({ lat, lon, start, end, step }),
+  };
+}
+
+/**
+ * "Calculate potential" for any coordinate → SCHEMA.md PotentialResult. Terrain comes from the
+ * same real LOLA grid as the other views; power is live when possible (see fetchEnginePotential).
+ * @param {{lat:number, lon:number, start:string, durationDays:number, step:string, panelAreaM2:number, tileKm:number}} p
+ * @returns {Promise<PotentialResult>}
+ */
+export async function calculatePotential({ lat, lon, start, durationDays, step, panelAreaM2, tileKm }) {
+  const end = new Date(Date.parse(start) + durationDays * DAY_MS).toISOString();
+  const [grid, engine] = await Promise.all([loadElevation(), fetchEnginePotential({ lat, lon, start, end, step })]);
+  const terrain = samplePatch(grid, lat, lon, { sizeKm: tileKm, n: 128 });
+  const stepH = ENGINE_STEPS[step];
+  const t0 = Date.parse(engine.response.start);
+  return {
+    request: { lat, lon, start, end, durationDays, step, panelAreaM2, tileKm },
+    site: {
+      name: engine.site?.name ?? 'Custom site',
+      backendId: engine.site?.id ?? null,
+      lat,
+      lon,
+      nearSide: Math.abs(lon) <= 90,
+      region: Math.abs(lat) >= 80 ? (lat < 0 ? 'South polar' : 'North polar') : Math.abs(lat) >= 60 ? 'High latitude' : 'Mid/low latitude',
+      altitudeM: terrain.centerElevationM,
+    },
+    terrain,
+    engine: {
+      ...engine,
+      efficiency: ENGINE_SETTINGS.panelEfficiency,
+      source: engine.dataSource === 'live' ? 'JPL Horizons via backend' : 'Mock engine (simplified geometry)',
+      // Samples are evenly spaced from `start`; the response carries values only (same as getSitePower).
+      times: engine.response.instantaneous_power_per_area_W_m2.map((_, i) => t0 + i * stepH * HOUR_MS),
+    },
+  };
+}
+
+/** Engine options the Playground form offers (Horizons step strings and the engine's fixed settings). */
+export { ENGINE_STEPS, ENGINE_SETTINGS };

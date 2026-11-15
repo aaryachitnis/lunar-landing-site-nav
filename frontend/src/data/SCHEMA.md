@@ -10,6 +10,7 @@ is below.
 | `getSkyModel(site, dateISO)` | **Mock:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
 | `getLunariumSites()` | **Mock:** Lunarium's site list in [`mock/sites.js`](mock/sites.js) |
 | `getTerrainPatch`, `getHorizonTerrain`, `getSiteHorizon` | NASA LOLA elevation data, processed in the browser |
+| `calculatePotential(params)` | Playground. **Live** backend `GET /sites/{id}/metrics` when the coordinates match a backend site, else **mock** ([`mock/engine.js`](mock/engine.js)); terrain from LOLA |
 
 Conventions: angles in degrees; latitude -90 to 90 (south negative); longitude -180 to 180 (east
 positive); times ISO 8601 UTC; azimuth clockwise from local north. Elevation is above the
@@ -151,3 +152,38 @@ into `public/terrain/<siteId>/` (served at `${VITE_DATA_BASE}terrain/<siteId>/`)
 - `near.f32`, `mid.i16`, `far.i16`: ~1.6 MB per 5 m site, ~0.55 MB otherwise.
 
 Sites without a pack are built in the browser from the global grid (`horizonTerrain.js`).
+
+## `calculatePotential(params) → PotentialResult` (Playground)
+
+Params: `{ lat, lon, start, durationDays, step, panelAreaM2, tileKm }` (`step` is a Horizons step string:
+`1hour`, `2hour`, `4hour`, `12hour` or `1day`).
+
+The backend only computes power for its own sites, so coordinates within 0.01° of a backend site
+use live data and anything else uses the mock engine. Both return the backend's
+`PowerMetricsResponse` unchanged in `engine.response`. If the live call fails, the mock is used and
+`engine.reason` says why.
+
+```json
+{
+  "request": { "lat": 0.67138, "lon": 23.47398, "start": "2026-11-15T00:00:00.000Z", "end": "…",
+               "durationDays": 30, "step": "4hour", "panelAreaM2": 2, "tileKm": 40 },
+  "site": { "name": "Apollo 11", "backendId": "site-3", "lat": 0.67138, "lon": 23.47398,
+            "nearSide": true, "region": "Mid/low latitude", "altitudeM": -1922 },
+  "terrain": "TerrainPatch (see getTerrainPatch), sizeKm = tileKm, n = 128",
+  "engine": {
+    "dataSource": "live | mock",
+    "reason": null,                       // why the mock was used, else null
+    "source": "JPL Horizons via backend",
+    "efficiency": 0.2,                    // backend setting, not in the response
+    "times": [1794787200000],             // epoch ms per sample: start + i × step
+    "response": {                         // backend PowerMetricsResponse, unchanged
+      "site": { "id": "site-3", "lat": 0.67138, "lon": 23.47398 },
+      "start": "2026-11-15T00:00:00Z", "end": "2026-12-15T00:00:00Z", "step": "4hour",
+      "instantaneous_power_per_area_W_m2": [0.0],
+      "daily_power_generated_per_area_kWh_per_m2_day": [0.0],
+      "average_power_per_24h_W_m2": 85.3,
+      "average_power_sunlit_days_W_m2": 150.5
+    }
+  }
+}
+```
