@@ -10,7 +10,8 @@ is below.
 | `getSkyModel(site, dateISO)` | **Modeled:** geometric model in [`mock/metrics.js`](mock/metrics.js) |
 | `getLunariumSites()` | **Mock:** Lunarium's site list in [`mock/sites.js`](mock/sites.js) |
 | `getTerrainPatch`, `getHorizonTerrain`, `getSiteHorizon` | NASA LOLA elevation data, processed in the browser |
-| `calculatePotential(params)` | Playground. **Live** backend `GET /sites/{id}/metrics` when the coordinates match a backend site, else **mock** ([`mock/engine.js`](mock/engine.js)); terrain from LOLA |
+| `calculatePotential(params)` | Playground. **Live** backend metrics for saved sites and custom coordinates; mock only if the backend request fails. Terrain from LOLA |
+| `addSite({ name, lat, lon })` | **Live:** explicitly adds a custom location to the backend JSON catalog |
 
 Conventions: angles in degrees; latitude -90 to 90 (south negative); longitude -180 to 180 (east
 positive); times ISO 8601 UTC; azimuth clockwise from local north. Elevation is above the
@@ -42,6 +43,10 @@ reshapes each site for the UI:
 - `terrainId` is set when a Lunarium terrain pack exists within 0.05° of the site. It also lets a
   Lunarium link (`?site=apollo-17`) select the same site on the Landing Sites tab.
 - `legacyId` is the backend's old position-based id, so links shared before sites were named still work.
+
+The backend reads `backend/data/sites.json` for each catalog lookup. New locations are added with
+`POST /sites`; there is intentionally no delete endpoint. Saving is explicit and separate from
+calculating metrics.
 
 ## `getSitePower(site, dateISO) → SitePower`
 
@@ -171,10 +176,9 @@ Sites without a pack are built in the browser from the global grid (`horizonTerr
 Params: `{ lat, lon, start, durationDays, step, panelAreaM2, tileKm }` (`step` is a Horizons step string:
 `1hour`, `2hour`, `4hour`, `12hour` or `1day`).
 
-The backend only computes power for its own sites, so coordinates within 0.01° of a backend site
-use live data and anything else uses the mock engine. Both return the backend's
-`PowerMetricsResponse` unchanged in `engine.response`. If the live call fails, the mock is used and
-`engine.reason` says why.
+Coordinates within 0.01° of a saved site use `GET /sites/{id}/metrics`; other coordinates use
+`POST /sites/metrics` with latitude and longitude. Both return the backend's `PowerMetricsResponse`
+unchanged in `engine.response`. If the live call fails, the mock is used and `engine.reason` says why.
 
 ```json
 {

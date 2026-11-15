@@ -1,3 +1,5 @@
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -7,6 +9,8 @@ from fastapi import HTTPException
 from app.api.routes import health, sites
 from app.config import get_settings
 from app.main import app
+from core import CustomMetricsRequest, SiteCreateRequest
+from data.sites import SITE_CATALOG_PATH
 from services import HorizonsRequestError, HorizonsUnavailableError
 
 
@@ -16,8 +20,12 @@ class ApiRouteTests(unittest.TestCase):
         self.assertIn("/health", paths)
         self.assertIn("/sites", paths)
         self.assertIn("/sites/{site_id}/metrics", paths)
+        self.assertIn("/sites/metrics", paths)
         metrics_parameters = paths["/sites/{site_id}/metrics"]["get"]["parameters"]
         self.assertIn("events_from", {parameter["name"] for parameter in metrics_parameters})
+        self.assertIn("post", paths["/sites/metrics"])
+        self.assertNotIn("delete", paths["/sites"])
+        self.assertIn("post", paths["/sites"])
 
     def test_health_route_returns_status(self) -> None:
         self.assertEqual(
@@ -39,6 +47,62 @@ class ApiRouteTests(unittest.TestCase):
         self.assertEqual(serialized["loc"], [-84.2287, 69.44396])
         self.assertEqual(serialized["lat"], -84.2287)
         self.assertEqual(serialized["lon"], 69.44396)
+
+    def test_create_site_persists_to_json_catalog(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sites.json"
+            path.write_text(
+                SITE_CATALOG_PATH.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            with patch("data.sites.SITE_CATALOG_PATH", path):
+                created = sites.create_site(
+                    SiteCreateRequest(name="Saved ridge", lat=-88.0, lon=45.0)
+                )
+                listed = sites.get_sites()
+
+        self.assertTrue(created.id.startswith("custom-"))
+        self.assertEqual(created.name, "Saved ridge")
+        self.assertIn(created.id, {site.id for site in listed})
+
+    def test_create_site_rejects_duplicate_coordinates(self) -> None:
+        with self.assertRaises(HTTPException) as duplicate:
+            sites.create_site(
+                SiteCreateRequest(name="Duplicate", lat=-84.2287, lon=69.44396)
+            )
+        self.assertEqual(duplicate.exception.status_code, 409)
+
+    def test_custom_metrics_route_uses_coordinates_without_a_site_id(self) -> None:
+        ephemeris = {
+            "AZ": np.array([0.0, 0.0, 0.0, 0.0]),
+            "EL": np.array([-10.0, 10.0, 10.0, -10.0]),
+            "datetime_jd": np.array(
+                [2_461_041.5, 2_461_041.75, 2_461_042.25, 2_461_042.5]
+            ),
+        }
+        request = CustomMetricsRequest(
+            lat=-87.0,
+            lon=43.0,
+            start="2026-01-01T00:00:00Z",
+            end="2026-01-02T00:00:00Z",
+            step="4hour",
+        )
+        with patch.object(
+            sites,
+            "fetch_solar_ephemeris",
+            return_value=ephemeris,
+        ) as fetch_ephemeris:
+            result = sites.get_custom_site_metrics(request, get_settings())
+
+        self.assertEqual(result.site.id, "custom-location")
+        self.assertEqual(result.site.loc, (-87.0, 43.0))
+        self.assertEqual(result.nearest_sunrise_utc, "2026-01-01T03:00:00Z")
+        fetch_ephemeris.assert_called_once_with(
+            {"lat": -87.0, "lon": 43.0, "elevation": 0, "body": 301},
+            "2026-01-01 00:00",
+            "2026-01-02 00:00",
+            "4hour",
+        )
 
     def test_unknown_site_and_invalid_ranges_return_http_errors(self) -> None:
         with self.assertRaises(HTTPException) as unknown_site:

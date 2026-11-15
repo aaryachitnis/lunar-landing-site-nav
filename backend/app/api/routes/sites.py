@@ -1,12 +1,24 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import Settings
 from app.dependencies import get_app_settings
-from core.models import PowerMetricsResponse, SiteSummary
-from core.utils import format_utc, get_lunar_sites_loc, parse_datetime
-from data import SITES, SiteRecord, find_site_record
+from core.models import (
+    CustomMetricsRequest,
+    PowerMetricsResponse,
+    SiteCreateRequest,
+    SiteSummary,
+)
+from core.utils import HorizonsLocation, format_utc, get_lunar_sites_loc, parse_datetime
+from data import (
+    DuplicateSiteError,
+    SiteRecord,
+    add_site_record,
+    find_site_record,
+    load_site_records,
+)
 from services import (
     HorizonsRequestError,
     HorizonsUnavailableError,
@@ -32,7 +44,7 @@ def _site_summary(site: SiteRecord) -> SiteSummary:
 
 
 def list_sites() -> list[SiteSummary]:
-    return [_site_summary(site) for site in SITES]
+    return [_site_summary(site) for site in load_site_records()]
 
 
 def resolve_site(site_id: str) -> SiteSummary:
@@ -47,24 +59,26 @@ def get_sites() -> list[SiteSummary]:
     return list_sites()
 
 
-@router.get("/{site_id}/metrics", response_model=PowerMetricsResponse)
-def get_site_metrics(
-    site_id: str,
-    start: str = Query(..., description="ISO 8601 start time."),
-    end: str = Query(..., description="ISO 8601 end time."),
-    step: str = Query(
-        default=_DEFAULT_HORIZONS_STEP,
-        min_length=1,
-        max_length=32,
-        description="Time step for the Horizons query (for example 4hour).",
-    ),
-    settings: Settings = Depends(get_app_settings),
-    events_from: Annotated[
-        str | None,
-        Query(description="Start time for sunrise/sunset search; defaults to start."),
-    ] = None,
-) -> PowerMetricsResponse:
-    site = resolve_site(site_id)
+@router.post("", response_model=SiteSummary, status_code=201)
+def create_site(request: SiteCreateRequest) -> SiteSummary:
+    try:
+        site = add_site_record(
+            request.name,
+            (request.lat, request.lon),
+            request.desc,
+            request.agency,
+        )
+    except DuplicateSiteError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return _site_summary(site)
+
+
+def _parse_metrics_window(
+    start: str,
+    end: str,
+    step: str,
+    events_from: str | None,
+) -> tuple[datetime, datetime, datetime, str]:
     try:
         start_datetime = parse_datetime(start)
         end_datetime = parse_datetime(end)
@@ -84,8 +98,18 @@ def get_site_metrics(
     step = step.strip()
     if not step:
         raise HTTPException(status_code=400, detail="Horizons step must not be empty.")
+    return start_datetime, end_datetime, events_start_datetime, step
 
-    location = get_lunar_sites_loc(site.loc)
+
+def _calculate_metrics(
+    site: SiteSummary,
+    location: HorizonsLocation,
+    start_datetime: datetime,
+    end_datetime: datetime,
+    events_start_datetime: datetime,
+    step: str,
+    settings: Settings,
+) -> PowerMetricsResponse:
     start_horizons = start_datetime.strftime("%Y-%m-%d %H:%M")
     end_horizons = end_datetime.strftime("%Y-%m-%d %H:%M")
     try:
@@ -142,4 +166,68 @@ def get_site_metrics(
         daily_power_generated_per_area_kWh_per_m2_day=daily_energy,
         average_power_per_24h_W_m2=average_power_24h,
         average_power_sunlit_days_W_m2=average_power_sunlit,
+    )
+
+
+@router.get("/{site_id}/metrics", response_model=PowerMetricsResponse)
+def get_site_metrics(
+    site_id: str,
+    start: str = Query(..., description="ISO 8601 start time."),
+    end: str = Query(..., description="ISO 8601 end time."),
+    step: str = Query(
+        default=_DEFAULT_HORIZONS_STEP,
+        min_length=1,
+        max_length=32,
+        description="Time step for the Horizons query (for example 4hour).",
+    ),
+    settings: Settings = Depends(get_app_settings),
+    events_from: Annotated[
+        str | None,
+        Query(description="Start time for sunrise/sunset search; defaults to start."),
+    ] = None,
+) -> PowerMetricsResponse:
+    site = resolve_site(site_id)
+    start_datetime, end_datetime, events_start_datetime, step = _parse_metrics_window(
+        start,
+        end,
+        step,
+        events_from,
+    )
+    location = get_lunar_sites_loc(site.loc)
+    return _calculate_metrics(
+        site,
+        location,
+        start_datetime,
+        end_datetime,
+        events_start_datetime,
+        step,
+        settings,
+    )
+
+
+@router.post("/metrics", response_model=PowerMetricsResponse)
+def get_custom_site_metrics(
+    request: CustomMetricsRequest,
+    settings: Settings = Depends(get_app_settings),
+) -> PowerMetricsResponse:
+    start_datetime, end_datetime, events_start_datetime, step = _parse_metrics_window(
+        request.start,
+        request.end,
+        request.step,
+        None,
+    )
+    site = SiteSummary(
+        id="custom-location",
+        name="Custom location",
+        loc=(request.lat, request.lon),
+        agency="Custom",
+    )
+    return _calculate_metrics(
+        site,
+        get_lunar_sites_loc(site.loc),
+        start_datetime,
+        end_datetime,
+        events_start_datetime,
+        step,
+        settings,
     )

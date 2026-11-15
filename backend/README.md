@@ -23,10 +23,14 @@ The frontend's dev server forwards `/api/*` here, so local development needs no 
 | Method and path | Returns |
 |---|---|
 | `GET /health` | Service status |
-| `GET /sites` | All sites with `id`, `name`, `loc`, `desc`, and `agency`; also includes `lat` and `lon` for compatibility |
+| `GET /sites` | Current JSON catalog with `id`, `name`, `loc`, `desc`, and `agency`; also includes `lat` and `lon` |
+| `POST /sites` | Add a named location to the catalog; duplicate coordinates return `409` |
+| `POST /sites/metrics` | Calculate metrics for unsaved coordinates supplied in the JSON body |
 | `GET /sites/{site_id}/metrics?start=…&end=…&step=4hour&events_from=…` | Solar power and nearest sunrise/sunset for the time range |
 
 `start` and `end` are ISO 8601 and required. A `Z` suffix or an offset is fine; times without one are treated as UTC. `step` is a Horizons step such as `2hour` and defaults to `4hour`. Optional `events_from` selects when the sunrise/sunset search begins; it must be within `start` and `end`, and defaults to `start`. A 30-day request takes several seconds.
+
+Custom metrics requests use `{ "lat": -89.0, "lon": 25.0, "start": "...", "end": "...", "step": "4hour" }`. They do not create or modify a catalog entry. To persist a site, send `POST /sites` with `{ "name": "...", "lat": -89.0, "lon": 25.0 }`. The add operation writes to `data/sites.json`; there is no delete endpoint.
 
 Metrics response:
 
@@ -41,11 +45,11 @@ Metrics response:
 Power is for a flat, horizontal panel, using the solar constant and panel efficiency in [`app/config.py`](app/config.py). Terrain shadowing is not included.
 Sunrise and sunset are estimated from Sun elevation crossing 0° by linear interpolation between Horizons samples. The `step` parameter therefore affects event-time precision.
 
-Errors: `400` bad dates or reversed range, `404` unknown site, `502` bad data from Horizons, `503` `astroquery` not installed.
+Errors: `400` bad dates or reversed range, `404` unknown site, `409` duplicate site coordinates, `422` invalid request body, `502` bad data from Horizons, `503` `astroquery` not installed.
 
 ## Sites
 
-The catalog is [`data/sites.py`](data/sites.py). Canonical IDs are stored with each site (for example, `orig1`); the previous position-based IDs (`site-1`, `site-2`, …) remain accepted for metrics requests. `loc` is `[latitude, longitude]` in planetocentric degrees, with east-positive longitude. Metrics responses include the same site metadata.
+The catalog is [`data/sites.json`](data/sites.json), a JSON array read and validated by [`data/sites.py`](data/sites.py). Each entry has `id`, `name`, `loc` (`[latitude, longitude]`), `desc`, and `agency`; coordinates are planetocentric degrees with east-positive longitude. Canonical IDs are stored with each site (for example, `orig1`); the previous position-based IDs (`site-1`, `site-2`, …) remain accepted for metrics requests. Coordinate-based metrics use the transient ID `custom-location`.
 
 ## Configuration
 
@@ -61,7 +65,8 @@ app/config.py             settings (solar constant, efficiency, default step, CO
 app/api/routes/           /health and /sites endpoints
 core/                     response models, coordinate and date helpers
 services/power_services.py   Horizons query and power calculations
-data/sites.py             site catalog
+data/sites.json           persisted site catalog
+data/sites.py             catalog validation, lookup and add operations
 tests/                    unit tests
 ```
 
