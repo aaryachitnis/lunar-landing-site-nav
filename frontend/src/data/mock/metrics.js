@@ -1,11 +1,11 @@
-// MOCK metrics generator. A deliberately simplified geometric model so the UI shows
-// plausible, internally consistent numbers until the Python backend provides real ones:
+// Mock Sun/Earth model: a simplified geometric model run in the browser. The backend does not
+// provide Sun/Earth positions yet, so the panel's Sun & Earth section and Lunarium use this.
 //   • Sun: subsolar longitude from the synodic phase (reference new moon 2000-01-06 18:14 UTC),
 //     subsolar latitude ±1.54° over the draconic year.
 //   • Earth: sub-Earth point wobbles with optical libration (±7.9° lon, ±6.7° lat).
-//   • Horizon: normally passed in (api.getSiteHorizon → the same 5 m/global LOLA horizon the Horizon View
+//   • Horizon: normally passed in (api.getSiteHorizon → the same 5 m/global LOLA horizon Lunarium
 //     renders, 0.5° steps); falls back to ray-marching the global grid here (2° steps) incl. curvature.
-//   • Power: sun-tracking panel, 2 m² at 30% efficiency, scaled by visible fraction of the solar disk.
+//   • Power (shown in Lunarium only): sun-tracking panel, 2 m² at 30%, scaled by visible Sun disk.
 // Not ephemeris-grade. Output shape documented in data/SCHEMA.md.
 
 import { MOON_RADIUS_KM, latLonToVec, enuBasis, elevAz, destination, clampLat } from '../../utils/coords.js';

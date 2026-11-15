@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { SITE_CATEGORIES } from '../../data/mock/sites.js';
-import { useSiteMetrics } from '../../hooks/useSiteMetrics.js';
+import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
+import { useSitePower } from '../../hooks/useSitePower.js';
+import { useSkyModel } from '../../hooks/useSkyModel.js';
 import { useTerrainPatch } from '../../hooks/useTerrainPatch.js';
 import { formatLat, formatLon, toDMS } from '../../utils/format.js';
 import { MAX_TIME_MS, MIN_TIME_MS, clampTime } from '../../utils/time.js';
 import TerrainView from '../TerrainView/TerrainView.jsx';
 import TimePicker from '../TimePicker/TimePicker.jsx';
-import MetricTiles from '../MetricTiles/MetricTiles.jsx';
+import { PowerTiles, SkyTiles } from '../MetricTiles/MetricTiles.jsx';
 import PowerChart from '../PowerChart/PowerChart.jsx';
 import './SitePanel.css';
 
@@ -18,12 +19,12 @@ const ALT_STATS = [
   { key: 'maxM', label: 'Max' },
 ];
 
-/**
- * Right-hand panel for the selected site.
- * @param {{ site: object, time: string, onTimeChange: (iso) => void, onClose: () => void }} props
- */
+const errorText = (e) => String(e.message ?? e);
+
+/** Right-hand panel for the selected site. */
 export default function SitePanel({ site, time, onTimeChange, onClose }) {
-  const metrics = useSiteMetrics(site, time);
+  const power = useSitePower(site, time);
+  const sky = useSkyModel(site, time);
   const terrain = useTerrainPatch(site, TERRAIN);
   const cat = SITE_CATEGORIES[site.category];
   const [altStat, setAltStat] = useState('meanM');
@@ -48,7 +49,6 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
               <span className="cat-dot" />
               {cat?.label}
             </span>
-            {site.mock && <span className="tag-mock" title="Placeholder data until the backend is connected">Mock data</span>}
           </div>
           <h2>{site.name}</h2>
           <p className="panel-sub">
@@ -99,19 +99,19 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
 
       <section className="panel-section">
         <h3>Terrain · bird's-eye</h3>
-        <TerrainView patch={patch} sunAzimuth={metrics.data?.now.sunAzimuth ?? null} loading={terrain.loading} />
+        <TerrainView patch={patch} sunAzimuth={sky.data?.now.sunAzimuth ?? null} loading={terrain.loading} />
         {patch && (
           <p className="panel-caption tabular">
             {patch.sizeKm} × {patch.sizeKm} km · {patch.n}×{patch.n} vertices · {Math.round(patch.spacingM)} m spacing ·
             relief {Math.round(patch.minM).toLocaleString()} to {Math.round(patch.maxM).toLocaleString()} m · source {patch.source}
           </p>
         )}
-        {terrain.error && <p className="field-error">{String(terrain.error.message ?? terrain.error)}</p>}
+        {terrain.error && <p className="field-error">{errorText(terrain.error)}</p>}
       </section>
 
       <section className="panel-section">
         <div className="section-head">
-          <h3>Conditions</h3>
+          <h3>Time</h3>
           <div className="time-controls">
             <button onClick={() => shiftDays(-1)} disabled={timeMs <= MIN_TIME_MS} aria-label="One day earlier">
               −1 d
@@ -122,21 +122,35 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
           </div>
         </div>
         <TimePicker value={time} onChange={onTimeChange} />
-        {metrics.loading && !metrics.data && <p className="muted">Computing…</p>}
-        {metrics.error && <p className="field-error">{String(metrics.error.message ?? metrics.error)}</p>}
-        {metrics.data && (
-          <div className={metrics.loading ? 'is-refreshing' : undefined}>
-            <MetricTiles metrics={metrics.data} />
+      </section>
+
+      <section className="panel-section">
+        <h3>Solar power</h3>
+        {power.loading && !power.data && <p className="muted">Fetching ephemeris from JPL Horizons…</p>}
+        {power.error && <p className="field-error">{errorText(power.error)}</p>}
+        {power.data && (
+          <div className={power.loading ? 'is-refreshing' : undefined}>
+            <PowerTiles power={power.data} />
+            <PowerChart power={power.data} />
           </div>
         )}
       </section>
 
-      {metrics.data && (
-        <section className="panel-section">
-          <h3>Timeline · 30 days</h3>
-          <PowerChart series={metrics.data.series} />
-        </section>
-      )}
+      <section className="panel-section">
+        <h3>
+          Sun &amp; Earth
+          <span className="tag-mock" title="Simplified geometric model run in the browser until the backend provides Sun and Earth data">
+            Mock
+          </span>
+        </h3>
+        {sky.loading && !sky.data && <p className="muted">Computing…</p>}
+        {sky.error && <p className="field-error">{errorText(sky.error)}</p>}
+        {sky.data && (
+          <div className={sky.loading ? 'is-refreshing' : undefined}>
+            <SkyTiles sky={sky.data} />
+          </div>
+        )}
+      </section>
     </aside>
   );
 }

@@ -11,14 +11,12 @@ const HIGH = new THREE.Color('#d6e9ff');
 /**
  * Bird's-eye 3D view of a local terrain patch (see data/SCHEMA.md → TerrainPatch).
  * Local frame: x = east, y = up, -z = north. Units: km.
- * @param {{ patch: object|null, sunAzimuth: number|null, loading: boolean }} props
  */
 export default function TerrainView({ patch, sunAzimuth, loading }) {
   const hostRef = useRef(null);
   const ctxRef = useRef(null);
   const [showMesh, setShowMesh] = useState(true);
 
-  // Renderer lifecycle
   useEffect(() => {
     const host = hostRef.current;
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -76,7 +74,6 @@ export default function TerrainView({ patch, sunAzimuth, loading }) {
     };
   }, []);
 
-  // Rebuild mesh when the patch changes
   useEffect(() => {
     const ctx = ctxRef.current;
     if (!ctx || !patch) return;
@@ -106,14 +103,12 @@ export default function TerrainView({ patch, sunAzimuth, loading }) {
     wire.name = 'wire';
     wire.renderOrder = 1;
 
-    // Site pin at the centre
     const pinMat = new THREE.MeshBasicMaterial({ color: 0x1ab2ff });
     const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 8, 8), pinMat);
     pin.position.y = 4;
     const head = new THREE.Mesh(new THREE.SphereGeometry(1.1, 16, 12), pinMat);
     head.position.y = 8.5;
 
-    // North arrow at the north edge
     const arrow = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4, 12), new THREE.MeshBasicMaterial({ color: 0xe6f1ff }));
     arrow.rotation.x = -Math.PI / 2;
     arrow.position.set(0, (maxM - centerElevationM) / 1000 * VERTICAL_EXAGGERATION + 2, -sizeKm / 2 - 4);

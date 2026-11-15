@@ -1,4 +1,4 @@
-# Horizon View — design
+# Horizon View (Lunarium): design
 
 Date: 2026-11-14 · Status: draft for approval · Context: hackathon, demo in a few days.
 
@@ -34,7 +34,7 @@ demo moment. Inspiration: Solarium-style "look around the sky" apps.
 - Camera passthrough / AR (WebXR `immersive-ar`). Motion sensors only.
 - Walking or moving around; the viewer is fixed at the site (eye height 2 m, see C12).
 - Real ephemeris (backend's job; frontend consumes whatever `getSiteMetrics` returns).
-- High-res terrain for non-polar sites (Apollo, Chang'e, etc.) — they get the coarse grid.
+- High-res terrain for non-polar sites (Apollo, Chang'e, etc.); they get the coarse grid.
 - Mapping the phone's real-world compass to lunar north.
 
 ## 4. Anti-goals (failure even if it "works")
@@ -49,7 +49,7 @@ demo moment. Inspiration: Solarium-style "look around the sky" apps.
 
 - Full 3D surface, as realistic as possible ("actually standing there").
 - Audience: mission planners checking Sun/Earth visibility and sunlight at a site.
-- Scrubbing time does **not** move the camera — the view stays where the user was looking.
+- Scrubbing time does **not** move the camera; the view stays where the user was looking.
 - Because panning and dragging at once is awkward: **play** is the main way to move time
   on phone, and each Sun/Earth label has a **Follow** toggle that locks the view onto that
   body while time runs. Moving the phone/dragging releases Follow.
@@ -67,10 +67,10 @@ demo moment. Inspiration: Solarium-style "look around the sky" apps.
 | C4 | **Terrain source v1:** NASA PGDA per-site 5 m LOLA DEMs (`https://pgda.gsfc.nasa.gov/data/LOLA_5mpp/SiteNN/SiteNN_final_adj_5mpp_surf.tif`, ~41–71 MB each, ~16 km square, south polar stereographic metres). Map: Site04 → Shackleton Rim, Site01 → Connecting Ridge, Site11 → de Gerlache Rim, Site20 → Leibnitz Beta, Site23 → Malapert. Beyond the tile, and for all other sites, use the existing 1.9 km `ldem_16` grid. The 3.3 GB 87°S mosaic and 1.8 GB 20 m map are **not** used in v1. | Fits in a few days; real 5 m detail where the demo sites are. |
 | C5 | A Node prep script (like `fetch-textures.mjs`, using existing `geotiff`/`sharp` devDeps) downloads the tiles once (git-ignored), reprojects to a local east/north grid centred on the site, and writes compact per-site files to `public/terrain/<siteId>/`. If the site's coordinates fall outside its tile, it falls back to coarse data and logs a warning. | Browser never touches raw GeoTIFFs. Teammate working on LOLA may later own this step in `backend/`; keep the output format documented in `SCHEMA.md` so either side can produce it. |
 | C6 | Rendering: three.js, imperative scene class (like `MoonScene.js`) in `src/scene/HorizonScene.js`, with a `useHorizonScene` hook. Concentric detail levels: fine mesh near the viewer, coarser outward, coarse far ring to ~150 km with lunar curvature applied (terrain drops below eye level with distance). | Matches existing architecture; keeps phone fps up. |
-| C7 | Near-field realism is **generated**: small craters and scattered rocks (instanced) within a few hundred metres, plus a tiled regolith detail normal/albedo texture. Seeded from site id so it is stable. Cosmetic only — excluded from horizon/visibility maths. | No dataset has human-scale detail. |
+| C7 | Near-field realism is **generated**: small craters and scattered rocks (instanced) within a few hundred metres, plus a tiled regolith detail normal/albedo texture. Seeded from site id so it is stable. Cosmetic only, excluded from horizon/visibility maths. | No dataset has human-scale detail. |
 | C8 | Lighting: one directional Sun light with shadows near the viewer, no ambient except faint Earthshine from Earth's direction; Sun disk 0.53° with glow; Earth 1.9° with its phase lit from the Sun direction; static starfield. | Looks lunar; matches existing "no ambient" look decision. |
 | C9 | Sun/Earth positions come from `getSiteMetrics(site, t).series` (hourly az/el), linearly interpolated for smooth playback. Window −12 h…+3 d is a slice of the existing −3 d…+27 d series. | No new API needed; backend swap is free. |
-| C11 | **Site coordinates vs tiles.** The PGDA→site mapping above was matched by name (PGDA product 78 lists Site01 Connecting ridge, Site04 Shackleton rim, Site11 de Gerlache rim, Site20 Leibnitz beta plateau, Site23 Malapert massif) and is **not yet verified by coordinates**. First step of the prep script: read each tile's bounds and check the app site lies inside with ≥ 2 km margin. If not, **move the site in `sites.js` to the tile's best-lit high point** (or tile centre) — the mock coordinates are already marked approximate/nudged. Dashboard numbers for those sites change; acceptable for mock data. | Keeps the demo sites on 5 m terrain (anti-goal 4). |
+| C11 | **Site coordinates vs tiles.** The PGDA→site mapping above was matched by name (PGDA product 78 lists Site01 Connecting ridge, Site04 Shackleton rim, Site11 de Gerlache rim, Site20 Leibnitz beta plateau, Site23 Malapert massif) and is **not yet verified by coordinates**. First step of the prep script: read each tile's bounds and check the app site lies inside with ≥ 2 km margin. If not, **move the site in `sites.js` to the tile's best-lit high point** (or tile centre). The mock coordinates are already marked approximate/nudged. Dashboard numbers for those sites change; acceptable for mock data. | Keeps the demo sites on 5 m terrain (anti-goal 4). |
 | C12 | **One observer height: 2 m** for both the view's eye height and the visibility/power horizon (replaces 1.7 m in §8). The horizon profile from §7 replaces the mock's coarse 2°-step profile for the dashboard too, so view, labels and dashboard all agree. | Single source of truth (anti-goal 1). |
 | C13 | **Demo time is found, not assumed.** Plan includes a step that scans the −12 h…+3 d series at each 5 m site for a sunset/sunrise or Earthset close to the ridge, picks the best site+time, and records it as the demo link in the README. If Shackleton has none, the demo uses whichever site does. | Shackleton may be lit throughout any 3-day window. |
 | C10 | Playback speeds: 1×, 1 h/s, 6 h/s. Bars: bright = fully visible, faded = partly blocked, empty = hidden; "+1d +2d +3d" ticks; current time in UTC. | |
