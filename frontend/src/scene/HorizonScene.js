@@ -1,9 +1,8 @@
-// SPIKE: first-person three.js scene for the Horizon View.
-// Local frame: x = east, y = up, z = −north, metres; origin on the ground at the site.
-// Three passes: sky (stars, Sun, Earth at "infinity"), then far terrain, then near terrain, each
-// with its own depth range, so terrain naturally hides the Sun/Earth behind ridges.
-// Performance: renders only when something changes; Sun visibility from distant ridges is
-// computed in a worker only when the Sun moves; pixel density adapts to frame time.
+// First-person three.js scene for Lunarium.
+// Local frame: x = east, y = up, z = -north, metres; origin on the ground at the site.
+// Three passes (sky, far terrain, near terrain), each with its own depth range, so ridges hide
+// the Sun and Earth. Renders only when something changes; distant-ridge shadows are computed in
+// a worker only when the Sun moves.
 
 import * as THREE from 'three';
 import { MOON_RADIUS_KM } from '../utils/coords.js';
