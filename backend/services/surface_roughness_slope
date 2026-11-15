@@ -1,0 +1,429 @@
+"""
+Surface slope and roughness at a landing site, from LOLA data.
+
+Give it landing site coordinates and a search radius; it returns the mean
+slope and the surface roughness around each site, from two kinds of LOLA data:
+
+A) LOLA's own slope and roughness maps  (the main answer)
+   LDSM_16 (slope, degrees) and LDRM_16 (roughness, metres), downloaded from
+   the LOLA data node: imbrium.mit.edu/DATA/LOLA_GDR/CYLINDRICAL/IMG/
+   Each 1.9 km pixel holds the average of slopes/roughness measured by the
+   laser at a baseline of about 30 to 120 m (LOLA GDR documentation: slope
+   from a plane fit to three successive laser shots, roughness as the
+   residual scatter around that plane). This is the scale that matters for
+   a lander touching down, so use these numbers for landing decisions.
+
+B) Slope and roughness computed from the LOLA elevation grid (lola_terrain.py)
+   Slopes between neighbouring elevation pixels. At 16 pixels/degree this is
+   a slope over several kilometres, so it is much gentler than (A). It is a
+   regional context number (is the site on a broad hillside?), not a
+   landing-hazard number. A finer grid (ELEV_PPD = 64) narrows the gap.
+   Heights are blended between pixels when sampled, which smooths the data a
+   little, so these values can read slightly low (in a worst-case test with
+   pure pixel-to-pixel noise, roughness came out at about half its true size).
+
+QuickMap (quickmap.lroc.asu.edu) is a web viewer. I have not found or
+verified a public programming interface for it, so this program reads the
+LOLA files directly rather than going through QuickMap.
+
+NEEDS: lola_terrain.py in the same folder (only for part B).
+       pip install numpy tifffile
+
+STATUS: draft. The map reading, circle statistics, interpolation and the
+elevation-based slope/roughness were tested on synthetic files with known
+answers. The real downloads, and the real label files' contents, have NOT
+been tested here (my sandbox cannot reach the servers): on the first run,
+check the 'Maps loaded' lines it prints (value ranges should be plausible:
+slopes from 0 up to a few tens of degrees, roughness from a fraction of a
+metre up to a few tens of metres).
+"""
+import csv
+import re
+import urllib.request
+from functools import lru_cache
+from pathlib import Path
+
+import numpy as np
+
+from lola_terrain import DATA_DIR, DEFAULT_PPD, load_elevation_grid
+
+MOON_RADIUS_KM = 1737.4
+GDR_BASE_URL = "https://imbrium.mit.edu/DATA/LOLA_GDR/CYLINDRICAL/IMG/"
+# Expected .IMG sizes in bytes (5760 x 2880 pixels, 2 bytes each)
+GDR_IMG_BYTES = {"LDSM_16": 33_177_600, "LDRM_16": 33_177_600}
+SLOPE_MAP = "LDSM_16"
+ROUGHNESS_MAP = "LDRM_16"
+
+# ----------------------------------------------------------------------
+# USER INPUTS (placeholders: replace with your own)
+# ----------------------------------------------------------------------
+# 2D list of [latitude, longitude] in degrees (east-positive longitude)
+SITES = [
+    [0.67, 23.47],     # Apollo 11 area (flat mare)
+    [20.19, 30.77],    # Apollo 17 area
+    [-89.5, 0.0],      # near the south pole
+    [-45.46, 177.59],  # far side
+]
+RADIUS_KM = 10.0           # how far around each site to look
+USE_ELEVATION_GRID = True  # also compute part B
+ELEV_PPD = DEFAULT_PPD     # elevation grid detail for part B (16 or 64)
+
+
+# ----------------------------------------------------------------------
+# Downloading and reading the LOLA slope / roughness maps
+# ----------------------------------------------------------------------
+def _download(url, dest, min_bytes):
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    print(f"Downloading {url}")
+    req = urllib.request.Request(url, headers={"User-Agent": "lunar-site-backend"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp, open(part, "wb") as out:
+            while True:
+                chunk = resp.read(1 << 20)
+                if not chunk:
+                    break
+                out.write(chunk)
+        if part.stat().st_size < min_bytes:
+            raise IOError("file is smaller than expected (truncated download?)")
+        part.replace(dest)
+    except Exception as exc:
+        part.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"Could not download {url}: {exc}\n"
+            f"If this machine cannot reach the server, download the file "
+            f"elsewhere and copy it to {dest}."
+        ) from exc
+
+
+def ensure_gdr_files(name, data_dir=DATA_DIR):
+    """Make sure NAME.IMG and NAME.LBL are in data/gdr/. Downloads only if
+    missing. Returns (img_path, lbl_path)."""
+    folder = Path(data_dir) / "gdr"
+    img, lbl = folder / f"{name}.IMG", folder / f"{name}.LBL"
+    expected = GDR_IMG_BYTES.get(name, 1)
+    if not (img.exists() and img.stat().st_size >= expected):
+        _download(f"{GDR_BASE_URL}{name}.IMG", img, expected)
+    if not lbl.exists():
+        _download(f"{GDR_BASE_URL}{name}.LBL", lbl, 100)
+    return img, lbl
+
+
+def _read_label(path):
+    """KEY = value pairs from a PDS label (first occurrence wins)."""
+    meta = {}
+    for line in Path(path).read_text(errors="ignore").splitlines():
+        m = re.match(r"^\s*([A-Z_0-9^]+)\s*=\s*(.+?)\s*$", line)
+        if m and m.group(1) not in meta:
+            meta[m.group(1)] = m.group(2).strip().strip('"')
+    return meta
+
+
+def _label_number(meta, key, default=None):
+    """A number from the label. Understands plain numbers and PDS radix
+    notation such as 16#8000#."""
+    if key not in meta:
+        if default is None:
+            raise ValueError(f"The label has no {key}; is this the right file?")
+        return default
+    text = meta[key]
+    radix = re.match(r"\s*(\d+)#([0-9A-Fa-f]+)#", text)
+    if radix:
+        return float(int(radix.group(2), int(radix.group(1))))
+    m = re.match(r"\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)", text)
+    if not m:
+        raise ValueError(f"Could not read a number for {key} from '{text}'")
+    return float(m.group(1))
+
+
+class GridMap:
+    """A global map on the LOLA grid: row 0 is 90 N, column 0 is 0 E,
+    longitude increases eastward to 360. Missing data is NaN."""
+
+    def __init__(self, name, values, units=""):
+        self.name = name
+        self.values = values                 # float32, NaN where no data
+        self.units = units
+        self.height, self.width = values.shape
+        self.ppd = self.width / 360.0
+        self.pixel_km = 2 * np.pi * MOON_RADIUS_KM / 360.0 / self.ppd
+
+    def describe(self):
+        v = self.values
+        ok = np.isfinite(v)
+        units = f" {self.units}" if self.units else ""
+        return (f"{self.name}: {self.width} x {self.height} pixels "
+                f"({self.pixel_km:.2f} km), values {np.nanmin(v):.3g} to "
+                f"{np.nanmax(v):.3g}{units}, "
+                f"{100 * (1 - ok.mean()):.1f}% no data")
+
+    def sample(self, lat_deg, lon_deg):
+        """Value at a point, blended from the four surrounding pixels
+        (bilinear). Pixels with no data are left out of the blend. Returns NaN
+        if all four are missing. Accepts numbers or arrays."""
+        lat = np.asarray(lat_deg, dtype=float)
+        lon = np.asarray(lon_deg, dtype=float)
+        x = (lon % 360.0) * self.ppd - 0.5
+        y = np.clip((90.0 - lat) * self.ppd - 0.5, 0.0, self.height - 1.0)
+        x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
+        fx, fy = x - x0, y - y0
+        x0, x1 = x0 % self.width, (x0 + 1) % self.width
+        y1 = np.minimum(y0 + 1, self.height - 1)
+
+        num = 0.0
+        den = 0.0
+        for yy, xx, w in ((y0, x0, (1 - fx) * (1 - fy)), (y0, x1, fx * (1 - fy)),
+                          (y1, x0, (1 - fx) * fy), (y1, x1, fx * fy)):
+            v = self.values[yy, xx]
+            good = np.isfinite(v)
+            num = num + np.where(good, w * np.where(good, v, 0.0), 0.0)
+            den = den + np.where(good, w, 0.0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out = np.where(den > 0, num / den, np.nan)
+        return out
+
+    def values_in_circle(self, lat, lon, radius_km):
+        """Valid pixel values within radius_km of the point, and the number of
+        pixels in the circle (including no-data ones)."""
+        theta = radius_km / MOON_RADIUS_KM
+        dth = np.degrees(theta)
+        ppd = self.ppd
+
+        top, bottom = min(lat + dth, 90.0), max(lat - dth, -90.0)
+        r0 = max(int(np.floor((90.0 - top) * ppd)) - 1, 0)
+        r1 = min(int(np.floor((90.0 - bottom) * ppd)) + 1, self.height - 1)
+        rows = np.arange(r0, r1 + 1)
+
+        if (np.sin(theta) >= np.cos(np.radians(lat)) or lat + dth >= 90
+                or lat - dth <= -90):
+            cols = np.arange(self.width)          # circle contains a pole
+        else:
+            dlon = np.degrees(np.arcsin(np.sin(theta) / np.cos(np.radians(lat))))
+            start = int(np.floor(((lon - dlon) % 360.0) * ppd)) - 1
+            n = int(np.ceil(2 * dlon * ppd)) + 3
+            cols = ((np.arange(n) + start) % self.width if n < self.width
+                    else np.arange(self.width))
+
+        block = self.values[np.ix_(rows, cols)]
+        lat_c = 90.0 - (rows + 0.5) / ppd
+        lon_c = (cols + 0.5) / ppd
+        dist = _haversine_km(lat, lon, lat_c[:, None], lon_c[None, :])
+        inside = block[dist <= radius_km]
+        return inside[np.isfinite(inside)], int(inside.size)
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    p1, p2 = np.radians(lat1), np.radians(lat2)
+    dl = np.radians(lon2 - lon1)
+    a = np.sin((p2 - p1) / 2) ** 2 + np.cos(p1) * np.cos(p2) * np.sin(dl / 2) ** 2
+    return 2 * MOON_RADIUS_KM * np.arcsin(np.sqrt(np.clip(a, 0.0, 1.0)))
+
+
+@lru_cache(maxsize=4)
+def load_gdr_map(name, data_dir=DATA_DIR):
+    """Download (first time only), read and convert a LOLA map to real units.
+    Grid size, scaling, byte order and the no-data value come from the .LBL
+    label file rather than being assumed."""
+    img, lbl = ensure_gdr_files(name, data_dir)
+    meta = _read_label(lbl)
+    lines = int(_label_number(meta, "LINES"))
+    samples = int(_label_number(meta, "LINE_SAMPLES"))
+    bits = int(_label_number(meta, "SAMPLE_BITS", default=16))
+    if bits != 16:
+        raise ValueError(f"{name}: expected 16-bit values, label says {bits}.")
+    if samples != 2 * lines:
+        raise ValueError(f"{name}: expected a global map (width = 2 x height), "
+                         f"got {samples} x {lines}.")
+
+    sample_type = meta.get("SAMPLE_TYPE", "").upper()
+    order = ">" if any(k in sample_type for k in ("MSB", "SUN", "MAC")) else "<"
+    kind = "u" if "UNSIGNED" in sample_type else "i"
+    raw = np.fromfile(img, dtype=f"{order}{kind}2", count=lines * samples)
+    if raw.size != lines * samples:
+        raise ValueError(f"{name}: file is shorter than the label says.")
+    raw = raw.reshape(lines, samples)
+
+    scale = _label_number(meta, "SCALING_FACTOR")
+    offset = _label_number(meta, "OFFSET", default=0.0)
+    values = raw.astype(np.float32) * np.float32(scale) + np.float32(offset)
+    if "MISSING_CONSTANT" in meta:
+        try:
+            values[raw == int(_label_number(meta, "MISSING_CONSTANT"))] = np.nan
+        except ValueError:
+            print(f"Warning: could not read MISSING_CONSTANT for {name}; "
+                  f"no-data pixels will not be masked.")
+    units = meta.get("UNIT", "") or meta.get("UNITS", "")
+    return GridMap(name, values, units.strip("<>"))
+
+
+# ----------------------------------------------------------------------
+# Part B: slope and roughness from the elevation grid
+# ----------------------------------------------------------------------
+def horn_slope_deg(z, spacing_m):
+    """Slope at each interior point of a square grid, using Horn's method
+    (a weighted look at the 8 neighbours). z is height in metres."""
+    a, b, c = z[:-2, :-2], z[:-2, 1:-1], z[:-2, 2:]
+    d, f = z[1:-1, :-2], z[1:-1, 2:]
+    g, h, i = z[2:, :-2], z[2:, 1:-1], z[2:, 2:]
+    dzdx = ((c + 2 * f + i) - (a + 2 * d + g)) / (8.0 * spacing_m)
+    dzdy = ((g + 2 * h + i) - (a + 2 * b + c)) / (8.0 * spacing_m)
+    return np.degrees(np.arctan(np.hypot(dzdx, dzdy)))
+
+
+def elevation_grid_stats(dem, lat, lon, radius_km):
+    """Slope and roughness from the elevation grid, within radius_km.
+
+    Heights are sampled on a flat local grid around the site, spaced one
+    elevation pixel apart (finer would only blur the data). Slope is measured
+    against the Moon's reference sphere. Roughness is the scatter of heights
+    left over after removing the best-fit flat plane (RMS, metres)."""
+    spacing = dem.pixel_km * 1000.0
+    n = int(np.floor(2 * radius_km * 1000.0 / spacing)) + 1
+    n += 1 - n % 2                                   # make it odd
+    if n < 5:
+        raise ValueError(
+            f"A radius of {radius_km} km is too small for this elevation grid "
+            f"({dem.pixel_km:.2f} km pixels). Use at least "
+            f"{2.5 * dem.pixel_km:.1f} km, or a finer grid (ELEV_PPD = 64).")
+
+    axis = (np.arange(n) - (n - 1) / 2.0) * spacing
+    X, Y = np.meshgrid(axis, axis)                   # east, north (metres)
+    dist = np.hypot(X, Y)
+    ang = dist / dem.offset
+    brg = np.arctan2(X, Y)                           # clockwise from north
+    lat1, lon1 = np.radians(lat), np.radians(lon)
+    lat2 = np.arcsin(np.sin(lat1) * np.cos(ang) +
+                     np.cos(lat1) * np.sin(ang) * np.cos(brg))
+    lon2 = lon1 + np.arctan2(np.sin(brg) * np.sin(ang) * np.cos(lat1),
+                             np.cos(ang) - np.sin(lat1) * np.sin(lat2))
+    z = np.asarray(dem.sample(np.degrees(lat2), np.degrees(lon2)), dtype=float)
+
+    inside = dist <= radius_km * 1000.0
+    slope = horn_slope_deg(z, spacing)
+    slope_in = slope[inside[1:-1, 1:-1]]
+
+    A = np.column_stack([np.ones(inside.sum()), X[inside], Y[inside]])
+    coef, *_ = np.linalg.lstsq(A, z[inside], rcond=None)
+    resid = z[inside] - A @ coef
+    return {
+        "dem_spacing_m": round(spacing, 0),
+        "dem_slope_mean_deg": round(float(slope_in.mean()), 2),
+        "dem_slope_median_deg": round(float(np.median(slope_in)), 2),
+        "dem_slope_max_deg": round(float(slope_in.max()), 2),
+        "dem_rms_roughness_m": round(float(np.sqrt(np.mean(resid ** 2))), 1),
+        "dem_relief_m": round(float(z[inside].max() - z[inside].min()), 1),
+    }
+
+
+# ----------------------------------------------------------------------
+# Putting it together
+# ----------------------------------------------------------------------
+def _summary(prefix, values, at_site, ndigits=2):
+    row = {f"{prefix}_at_site": None if not np.isfinite(at_site)
+           else round(float(at_site), ndigits)}
+    if values.size:
+        row[f"{prefix}_mean"] = round(float(values.mean()), ndigits)
+        row[f"{prefix}_median"] = round(float(np.median(values)), ndigits)
+        row[f"{prefix}_max"] = round(float(values.max()), ndigits)
+    else:
+        row.update({f"{prefix}_mean": None, f"{prefix}_median": None,
+                    f"{prefix}_max": None})
+    return row
+
+
+def site_surface_stats(slope_map, rough_map, dem, lat, lon, radius_km):
+    """Slope and roughness around one site. Returns a dictionary."""
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError(f"Latitude {lat} is outside -90 to 90 degrees.")
+    if not -180.0 <= lon <= 360.0:
+        raise ValueError(f"Longitude {lon} is outside -180 to 360 degrees.")
+    if radius_km <= 0:
+        raise ValueError("radius_km must be positive.")
+
+    row = {"lat": lat, "lon": lon, "radius_km": radius_km}
+    sv, n_px = slope_map.values_in_circle(lat, lon, radius_km)
+    rv, _ = rough_map.values_in_circle(lat, lon, radius_km)
+    row.update(_summary("slope", sv, float(slope_map.sample(lat, lon))))
+    row.update(_summary("roughness", rv, float(rough_map.sample(lat, lon))))
+    row["map_pixels_in_circle"] = n_px
+    row["map_pixels_with_data"] = int(sv.size)
+
+    if dem is not None:
+        try:
+            row.update(elevation_grid_stats(dem, lat, lon, radius_km))
+        except Exception as exc:   # part B failing must not lose part A
+            row["dem_error"] = str(exc)
+    return row
+
+
+def analyse_sites(sites, radius_km=RADIUS_KM, use_dem=USE_ELEVATION_GRID,
+                  ppd=ELEV_PPD):
+    slope_map = load_gdr_map(SLOPE_MAP)
+    rough_map = load_gdr_map(ROUGHNESS_MAP)
+    dem = load_elevation_grid(ppd) if use_dem else None
+    print("Maps loaded:")
+    print("  " + slope_map.describe())
+    print("  " + rough_map.describe())
+    results = []
+    for i, (lat, lon) in enumerate(sites):
+        row = {"site": i}
+        try:
+            row.update(site_surface_stats(slope_map, rough_map, dem,
+                                          lat, lon, radius_km))
+        except Exception as exc:
+            row.update({"lat": lat, "lon": lon, "error": str(exc)})
+        results.append(row)
+    return results
+
+
+def print_report(results):
+    def fmt(x, unit=""):
+        return "no data" if x is None else f"{x}{unit}"
+    for r in results:
+        print("=" * 72)
+        if "error" in r:
+            print(f"Site {r['site']} ({r['lat']}, {r['lon']}): {r['error']}")
+            continue
+        print(f"Site {r['site']} (lat {r['lat']}, lon {r['lon']}), "
+              f"within {r['radius_km']:g} km")
+        print(f"  LOLA slope map (about 30-120 m baseline):")
+        print(f"     at the site {fmt(r['slope_at_site'], ' deg')} | "
+              f"mean {fmt(r['slope_mean'], ' deg')} | "
+              f"median {fmt(r['slope_median'], ' deg')} | "
+              f"max {fmt(r['slope_max'], ' deg')}")
+        print(f"  LOLA roughness map (same baseline):")
+        print(f"     at the site {fmt(r['roughness_at_site'], ' m')} | "
+              f"mean {fmt(r['roughness_mean'], ' m')} | "
+              f"median {fmt(r['roughness_median'], ' m')} | "
+              f"max {fmt(r['roughness_max'], ' m')}")
+        print(f"     ({r['map_pixels_with_data']} of "
+              f"{r['map_pixels_in_circle']} map pixels in the circle have data)")
+        if "dem_error" in r:
+            print(f"  From the elevation grid: {r['dem_error']}")
+        elif "dem_slope_mean_deg" in r:
+            print(f"  From the elevation grid (broad scale, about "
+                  f"{2 * r['dem_spacing_m'] / 1000:.1f} km baseline):")
+            print(f"     mean slope {r['dem_slope_mean_deg']} deg | "
+                  f"max {r['dem_slope_max_deg']} deg | RMS roughness "
+                  f"{r['dem_rms_roughness_m']} m | relief {r['dem_relief_m']} m")
+    print("\nNote: slope and roughness depend on the scale they are measured "
+          "at; rougher at short baselines. Use the LOLA map values for "
+          "landing-scale hazards and the elevation-grid values for broad "
+          "context.")
+
+
+def save_csv(results, path="site_surface_stats.csv"):
+    first = ["site", "lat", "lon", "radius_km"]
+    keys = sorted({k for r in results for k in r},
+                  key=lambda k: (first.index(k) if k in first else len(first), k))
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys)
+        w.writeheader()
+        w.writerows(results)
+
+
+if __name__ == "__main__":
+    out = analyse_sites(SITES)
+    print_report(out)
+    save_csv(out)
+    print("Saved site_surface_stats.csv")
