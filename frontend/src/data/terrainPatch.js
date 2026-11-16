@@ -1,11 +1,7 @@
 // Pure terrain-patch sampler (no fetching), shared by api.js and build scripts.
 import { destination, clampLat } from '../utils/coords.js';
 
-/**
- * Square patch centred on (lat, lon), sampled on a local tangent-plane grid (azimuthal
- * equidistant) so it works at the poles. Shape: SCHEMA.md → TerrainPatch.
- * @param {{sample:(lat:number, lon:number)=>number, resolutionM:number, dataset:string}} grid
- */
+/** Square patch on a local tangent-plane grid (azimuthal equidistant), so it works at the poles. */
 export function samplePatch(grid, lat, lon, { sizeKm = 80, n = 128 } = {}) {
   const la0 = clampLat(lat);
   const step = sizeKm / (n - 1);

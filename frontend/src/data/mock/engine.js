@@ -1,14 +1,5 @@
-// MOCK fallback for Playground requests when the live backend cannot compute metrics.
-//
-// Returns exactly the shape of the engine's `PowerMetricsResponse` (backend/core/models.py), keys
-// and units included, so live and mock results render the same way.
-//
-// Model (same as the real engine, but with mock geometry):
-//   • Sun elevation: the frontend's mock ephemeris (mock/metrics.js, also used by the God's-eye view)
-//     instead of JPL Horizons.
-//   • Power per m² = solar constant × efficiency × max(0, cos β), β = angle from the local vertical,
-//     i.e. a horizontal panel with no terrain shadowing, like services/power_services.py.
-//   • Daily energy: trapezoid integration into consecutive 24 h bins from the first sample (kWh/m²).
+// Playground fallback when the backend can't compute metrics. Same PowerMetricsResponse shape and
+// flat-panel formula as services/power_services.py, but with the browser's mock Sun model.
 
 import { computeSiteMetrics } from './metrics.js';
 
@@ -24,10 +15,6 @@ const FLAT_HORIZON = { stepDeg: 90, elevation: [-90, -90, -90, -90] };
 
 const formatUtc = (ms) => new Date(ms).toISOString().replace('.000Z', 'Z');
 
-/**
- * @param {{lat:number, lon:number, start:string, end:string, step:string}} q  start/end ISO 8601
- * @returns {PowerMetricsResponse} (snake_case, as the FastAPI engine returns it)
- */
 export function mockEnginePotential({ lat, lon, start, end, step }) {
   const stepH = ENGINE_STEPS[step];
   if (!stepH) throw new Error(`Unsupported step "${step}"`);

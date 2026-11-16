@@ -1,3 +1,4 @@
+// Part of Lunarium, made with SI generation.
 // Computes Sun visibility (0..1, fraction of the solar disk above the terrain) on coarse grids
 // over the mid and far terrain layers, for one Sun direction. Runs off the main thread and only
 // when the Sun has moved, instead of ray-marching per vertex every frame.

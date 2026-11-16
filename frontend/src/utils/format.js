@@ -30,4 +30,3 @@ export function formatDuration(hours) {
 export const formatDeg = (v, digits = 1) => (v == null ? 'n/a' : `${v.toFixed(digits)}°`);
 export const formatPct = (v) => (v == null ? 'n/a' : `${Math.round(v * 100)}%`);
 
-// Date/time formatting and validation live in utils/time.js.

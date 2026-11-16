@@ -1,9 +1,5 @@
 import './LightToggle.css';
 
-/**
- * "Let there be light" switch for the globe's night side.
- * @param {{ lit: boolean, onToggle: () => void, style?: object }} props
- */
 export default function LightToggle({ lit, onToggle, style }) {
   return (
     <button

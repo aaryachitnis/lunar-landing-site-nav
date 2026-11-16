@@ -5,7 +5,6 @@ import LightToggle from '../LightToggle/LightToggle.jsx';
 import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
 import './MoonView.css';
 
-/** Landing Sites globe (god's-eye view) with HTML site markers. */
 export default function MoonView({ sites, selectedSite, onSelect, insets }) {
   const containerRef = useRef(null);
   const markerEls = useRef(new Map());
