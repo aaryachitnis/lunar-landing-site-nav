@@ -1,10 +1,3 @@
-// The only module components and hooks import data from. Return shapes are in SCHEMA.md.
-//
-// Live (FastAPI backend):  getSites, getSitePower
-// Modeled in the browser:  getSkyModel (Sun/Earth positions), getLunariumSites
-// Terrain (NASA LOLA):     getTerrainPatch, getHorizonTerrain, getSiteHorizon
-// Playground:              calculatePotential (live backend metrics, mock on errors)
-
 import { fetchJson, postJson } from './backend.js';
 import { describeSite } from './siteCatalog.js';
 import { MOCK_SITES } from './mock/sites.js';
@@ -28,11 +21,8 @@ const cached = (map, key, make) => {
   return map.get(key);
 };
 
-// ── Sites ──────────────────────────────────────────────────────────────────
-
 let sitesPromise = null;
 
-/** @returns {Promise<Site[]>} Backend sites with display names attached. */
 export function getSites() {
   if (!sitesPromise) {
     const request = fetchJson('/sites').then((sites) => sites.map(describeSite));
@@ -44,14 +34,12 @@ export function getSites() {
   return sitesPromise;
 }
 
-/** Add a custom location to the persistent backend catalog. */
 export async function addSite({ name, lat, lon }) {
   const site = await postJson('/sites', { name, lat, lon });
   sitesPromise = null;
   return describeSite(site);
 }
 
-/** @returns {Promise<Site[]>} Lunarium's own site list (mock catalog with terrain packs). */
 export async function getLunariumSites() {
   return MOCK_SITES;
 }
@@ -64,16 +52,10 @@ export async function getLunariumSite(id) {
   return live.find((s) => s.id === id || s.legacyId === id) ?? null;
 }
 
-// ── Solar power (live) ─────────────────────────────────────────────────────
-
 export const POWER_WINDOW = { daysBefore: 3, daysAfter: 27, stepHours: 2 };
 const powerCache = new Map();
 
-/**
- * Solar power per m² for a flat panel, from the backend's JPL Horizons ephemeris.
- * The window runs from 3 days before to 27 days after `dateISO`.
- * @returns {Promise<SitePower>}
- */
+/** Flat-panel power from JPL Horizons, 3 days before to 27 days after `dateISO`. */
 export function getSitePower(site, dateISO) {
   const t0 = Date.parse(dateISO);
   const { daysBefore, daysAfter, stepHours } = POWER_WINDOW;
@@ -86,6 +68,7 @@ export function getSitePower(site, dateISO) {
       end,
       step: `${stepHours}hour`,
       events_from: new Date(t0).toISOString(),
+      include_sky: 'true',
     });
     // Samples are evenly spaced from `start`; the response carries values only.
     const startMs = Date.parse(res.start);
@@ -110,6 +93,20 @@ export function getSitePower(site, dateISO) {
       avgSunlitDaysWPerM2: res.average_power_sunlit_days_W_m2,
       nearestSunriseUtc: res.nearest_sunrise_utc,
       nearestSunsetUtc: res.nearest_sunset_utc,
+      sky: res.sky
+        ? {
+            sunAltitudeDeg: res.sky.sun_altitude_degrees,
+            sunVisible: res.sky.sun_visible,
+            earthAltitudeDeg: res.sky.earth_altitude_degrees,
+            earthVisible: res.sky.earth_visible,
+            nearestEarthriseUtc: res.sky.nearest_earthrise_utc,
+            nearestEarthsetUtc: res.sky.nearest_earthset_utc,
+            longestDarknessH: res.sky.longest_darkness_hours,
+            sunlitFraction: res.sky.sunlit_fraction,
+          }
+        : null,
+      skyError: res.sky_error ?? null,
+      windowDays: daysAfter,
       source: 'JPL Horizons via backend',
     };
   });
@@ -123,30 +120,18 @@ function valueAt(series, t) {
   return a.wPerM2 + ((b.wPerM2 - a.wPerM2) * (t - a.t)) / (b.t - a.t);
 }
 
-// ── Sun & Earth (mock) ─────────────────────────────────────────────────────
-
-/**
- * Sun and Earth positions, visibility and rise/set times from a simplified geometric model
- * run in the browser. Mocked until the backend provides Sun/Earth data.
- * @returns {Promise<SkyModel>}
- */
+/** Modeled Sun/Earth for Lunarium; the site panel's tiles use live data from getSitePower. */
 export async function getSkyModel(site, dateISO) {
   const horizon = await getSiteHorizon(site);
   return computeSiteMetrics(null, site, new Date(dateISO), { horizon });
 }
-
-// ── Terrain ────────────────────────────────────────────────────────────────
 
 const packMetaCache = new Map();
 const terrainCache = new Map();
 const packId = (site) => site.terrainId ?? site.id;
 const packMeta = (site) => cached(packMetaCache, packId(site), () => fetchPackMeta(TERRAIN_BASE, packId(site)));
 
-/**
- * First-person terrain and terrain horizon. Uses the site's prebuilt pack when there is one,
- * otherwise builds it from the global elevation grid in the browser.
- * @returns {Promise<HorizonTerrain>}
- */
+/** Uses the site's prebuilt terrain pack if there is one, else builds it from the global grid. */
 export function getHorizonTerrain(site) {
   return cached(terrainCache, packId(site), async () => {
     const meta = await packMeta(site);
@@ -163,25 +148,15 @@ export async function getSiteHorizon(site) {
   return meta ? meta.horizon : (await getHorizonTerrain(site)).horizon;
 }
 
-/**
- * Square terrain patch centred on a site, on a local tangent-plane grid so it works at the poles.
- * @returns {Promise<TerrainPatch>}
- */
 export async function getTerrainPatch(lat, lon, opts = {}) {
   const grid = await loadElevation();
   return samplePatch(grid, lat, lon, opts);
 }
 
-// ── Playground (/playground) ───────────────────────────────────────────────
-//
-// Power for any coordinate uses the shared metrics calculator. Saved sites use their ID;
-// unsaved coordinates are sent to the coordinate-based backend endpoint.
-
 // Within ~0.3 km of a backend site counts as "that site" (catalogue coordinates have 4–5 decimals).
 const PLAYGROUND_MATCH_DEG = 0.01;
 const playgroundPowerCache = new Map();
 
-/** The site in `sites` at these coordinates, or null. Pure, so the form can show live/mock status. */
 export function matchBackendSite(sites, lat, lon) {
   if (!sites || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   return sites.find((s) => Math.abs(s.lat - lat) < PLAYGROUND_MATCH_DEG && Math.abs(s.lon - lon) < PLAYGROUND_MATCH_DEG) ?? null;
@@ -196,10 +171,7 @@ async function findBackendSite(lat, lon) {
   }
 }
 
-/**
- * Engine call for the Playground. Returns the backend's PowerMetricsResponse (snake_case) plus
- * where it came from: { dataSource: 'live' | 'mock', site, reason, response }.
- */
+/** → { dataSource: 'live' | 'mock', site, reason, response: PowerMetricsResponse }. */
 export async function getPotentialMetrics({ lat, lon, start, end, step }) {
   const { site } = await findBackendSite(lat, lon);
   const cacheSite = site?.id ?? `${lat},${lon}`;
@@ -223,12 +195,7 @@ export async function getPotentialMetrics({ lat, lon, start, end, step }) {
   }
 }
 
-/**
- * "Calculate potential" for any coordinate → SCHEMA.md PotentialResult. Terrain comes from the
- * same real LOLA grid as the other views; power is live when possible.
- * @param {{lat:number, lon:number, start:string, durationDays:number, step:string, panelAreaM2:number, tileKm:number}} p
- * @returns {Promise<PotentialResult>}
- */
+/** "Calculate potential" for any coordinate → PotentialResult (SCHEMA.md). */
 export async function calculatePotential({ lat, lon, start, durationDays, step, panelAreaM2, tileKm }) {
   const end = new Date(Date.parse(start) + durationDays * DAY_MS).toISOString();
   const [grid, engine] = await Promise.all([
@@ -254,11 +221,10 @@ export async function calculatePotential({ lat, lon, start, durationDays, step, 
       ...engine,
       efficiency: ENGINE_SETTINGS.panelEfficiency,
       source: engine.dataSource === 'live' ? 'JPL Horizons via backend' : 'Mock engine (simplified geometry)',
-      // Samples are evenly spaced from `start`; the response carries values only (same as getSitePower).
+      // Samples are evenly spaced from `start`; the response carries values only.
       times: engine.response.instantaneous_power_per_area_W_m2.map((_, i) => t0 + i * stepH * HOUR_MS),
     },
   };
 }
 
-/** Engine options the Playground form offers (Horizons step strings and the engine's fixed settings). */
 export { ENGINE_STEPS, ENGINE_SETTINGS };

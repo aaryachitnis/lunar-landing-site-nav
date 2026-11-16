@@ -21,7 +21,6 @@ const ALT_STATS = [
 
 const errorText = (e) => String(e.message ?? e);
 
-/** ⓘ button that shows the site description on hover, keyboard focus or tap. */
 function InfoTip({ text }) {
   const [open, setOpen] = useState(false);
   return (
@@ -44,7 +43,6 @@ function InfoTip({ text }) {
   );
 }
 
-/** Right-hand panel for the selected site. */
 export default function SitePanel({ site, time, onTimeChange, onClose }) {
   const power = useSitePower(site, time);
   const sky = useSkyModel(site, time);
@@ -163,18 +161,23 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
       <section className="panel-section">
         <h3>
           Sun &amp; Earth
-          <span className="tag-mock" title="Sunrise and sunset use JPL Horizons; other Sun/Earth estimates are modeled in the browser">
-            Hybrid
+          <span className="tag-mock is-live" title="JPL Horizons metrics; terrain obstruction is not included">
+            Live
           </span>
         </h3>
-        {sky.loading && !sky.data && <p className="muted">Computing…</p>}
-        {sky.error && <p className="field-error">{errorText(sky.error)}</p>}
-        {sky.data && (
-          <div className={sky.loading ? 'is-refreshing' : undefined}>
+        {power.loading && !power.data && <p className="muted">Fetching Sun/Earth ephemeris from JPL Horizons…</p>}
+        {power.error && !power.data && <p className="field-error">{errorText(power.error)}</p>}
+        {power.data && (
+          <div className={power.loading ? 'is-refreshing' : undefined}>
+            {power.data.skyError && (
+              <p className="field-error">Live sky metrics unavailable: {power.data.skyError}</p>
+            )}
             <SkyTiles
-              sky={sky.data}
+              sky={power.data.sky}
               sunEvents={power.data}
               selectedTime={time}
+              windowDays={power.data.windowDays}
+              skyError={power.data.skyError}
               sunEventsLoading={power.loading}
               sunEventsError={power.error}
             />

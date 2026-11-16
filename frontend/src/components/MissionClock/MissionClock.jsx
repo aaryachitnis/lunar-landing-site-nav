@@ -3,7 +3,6 @@ import './MissionClock.css';
 
 const pad = (n) => String(n).padStart(2, '0');
 
-/** Live UTC clock for the nav bar (mission-control style). */
 export default function MissionClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {

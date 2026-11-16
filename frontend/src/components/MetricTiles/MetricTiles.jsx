@@ -22,7 +22,6 @@ function Tile({ label, value, sub }) {
 
 const wm2 = (v) => (v == null ? '…' : `${v < 10 ? v.toFixed(1) : Math.round(v)} W/m²`);
 
-/** Live solar power from the backend. See SCHEMA.md → SitePower. */
 export function PowerTiles({ power }) {
   const days = power.daily.length;
   return (
@@ -36,26 +35,26 @@ export function PowerTiles({ power }) {
   );
 }
 
-/** Modeled Sun/Earth metrics with sunrise and sunset from the live backend. */
+/** Live Sun/Earth metrics from JPL Horizons, evaluated against the astronomical horizon. */
 export function SkyTiles({
   sky,
   sunEvents,
   selectedTime,
+  windowDays = 27,
+  skyError,
   sunEventsLoading,
   sunEventsError,
 }) {
-  const { now, window: w } = sky;
-  const windowNote = `next ${w.days} d`;
-  const vsTerrain = (above) => `${above >= 0 ? '+' : ''}${above.toFixed(1)}° vs terrain`;
+  const windowNote = `next ${windowDays} d`;
   const hoursUntil = (eventTime) => {
     if (!eventTime) return null;
     const delta = Date.parse(eventTime) - Date.parse(selectedTime);
     return Number.isFinite(delta) && delta >= -1000 ? Math.max(0, delta / 3.6e6) : null;
   };
-  const until = (label, eventTime) => {
+  const until = (label, eventTime, skyRequired = false) => {
     const hours = hoursUntil(eventTime);
     const loading = sunEventsLoading;
-    const unavailable = !loading && sunEventsError;
+    const unavailable = !loading && (sunEventsError || (skyRequired && (skyError || !sky)));
     return (
       <Tile
         label={label}
@@ -74,24 +73,43 @@ export function SkyTiles({
   };
   return (
     <div className="tiles">
-      <Tile label="Sun altitude" value={formatDeg(now.sunElevation)} sub={`az ${formatDeg(now.sunAzimuth, 0)} · ${vsTerrain(now.sunAboveHorizon)}`} />
-      <Tile label="Sun visible" value={<YesNo ok={now.sunUp} />} sub="at selected time" />
+      <Tile
+        label="Sun altitude"
+        value={formatDeg(sky?.sunAltitudeDeg)}
+        sub={sky ? 'JPL Horizons · astronomical horizon' : 'Live sky metrics unavailable'}
+      />
+      <Tile
+        label="Sun visible"
+        value={sky ? <YesNo ok={sky.sunVisible} /> : 'n/a'}
+        sub="at selected time · astronomical horizon"
+      />
       {until('Time to sunset', sunEvents?.nearestSunsetUtc)}
       {until('Time to sunrise', sunEvents?.nearestSunriseUtc)}
-      <Tile label="Earth altitude" value={formatDeg(now.earthElevation)} sub={`az ${formatDeg(now.earthAzimuth, 0)} · ${vsTerrain(now.earthAboveHorizon)}`} />
-      <Tile label="Earth visible" value={<YesNo ok={now.earthUp} />} sub="at selected time" />
       <Tile
-        label="Time to Earthset"
-        value={formatDuration(now.hoursToEarthset)}
-        sub={now.hoursToEarthset == null ? `not within ${windowNote}` : 'modeled'}
+        label="Earth altitude"
+        value={formatDeg(sky?.earthAltitudeDeg)}
+        sub={sky ? 'JPL Horizons · astronomical horizon' : 'Live sky metrics unavailable'}
       />
       <Tile
-        label="Time to Earthrise"
-        value={formatDuration(now.hoursToEarthrise)}
-        sub={now.hoursToEarthrise == null ? `not within ${windowNote}` : 'modeled'}
+        label="Earth visible"
+        value={sky ? <YesNo ok={sky.earthVisible} /> : 'n/a'}
+        sub="at selected time · astronomical horizon"
       />
-      <Tile label="Sunlit" value={`${Math.round(w.illuminatedFraction * 100)}%`} sub={windowNote} />
-      <Tile label="Longest darkness" value={formatDuration(w.longestDarknessH)} sub={windowNote} />
+      {until('Time to Earthset', sky?.nearestEarthsetUtc, true)}
+      {until('Time to Earthrise', sky?.nearestEarthriseUtc, true)}
+      <Tile
+        label="Sunlit"
+        value={sky ? `${Math.round(sky.sunlitFraction * 100)}%` : 'n/a'}
+        sub={windowNote}
+      />
+      <Tile
+        label="Longest darkness"
+        value={formatDuration(sky?.longestDarknessH)}
+        sub={windowNote}
+      />
+      <p className="tiles-note">
+        JPL Horizons data; visibility and darkness use the astronomical horizon and do not account for local terrain.
+      </p>
     </div>
   );
 }

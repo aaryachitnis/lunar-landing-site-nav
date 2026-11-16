@@ -3,7 +3,6 @@ import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
 import { formatLat, formatLon } from '../../utils/format.js';
 import './SiteList.css';
 
-/** Left-hand list of landing sites grouped by category, with search. */
 export default function SiteList({ sites, selectedId, onSelect, loading, error, collapsed, onToggle }) {
   const [query, setQuery] = useState('');
 

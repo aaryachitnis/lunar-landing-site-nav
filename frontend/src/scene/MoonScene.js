@@ -125,6 +125,7 @@ export class MoonScene {
     return new THREE.Vector3(...latLonToMeshLocal(lat, lon, distance)).applyEuler(this.moon?.rotation ?? new THREE.Euler(0, -Math.PI / 2, 0));
   }
 
+  // Star background, made with SI generation (the Moon model is not).
   #makeStars() {
     const n = 4000;
     const pos = new Float32Array(n * 3);

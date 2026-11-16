@@ -40,11 +40,6 @@ function TooltipBox({ active, payload, label, unit, digits, title }) {
   );
 }
 
-/**
- * "Any other info from the processing engine": the engine's PowerMetricsResponse, plus totals
- * for the user's panel area and a few figures derived from the samples.
- * @param {{ engine: object, request: object }} props
- */
 export default function EngineResults({ engine, request }) {
   const r = engine.response;
   const power = r.instantaneous_power_per_area_W_m2;

@@ -31,11 +31,6 @@ function renderRelief({ n, heights, minM, maxM, spacingM }) {
   return img;
 }
 
-/**
- * 2D terrain map of a TerrainPatch (row 0 = north, column 0 = west), with the site at the centre,
- * a north arrow, a scale bar, an altitude legend and a hover readout.
- * @param {{ patch: object }} props
- */
 export default function TerrainMap2D({ patch }) {
   const canvasRef = useRef(null);
   const [hover, setHover] = useState(null);

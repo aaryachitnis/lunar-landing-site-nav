@@ -27,7 +27,6 @@ function TooltipBox({ active, payload, label }) {
   );
 }
 
-/** Solar power per m² over the window, plus a daily energy table. */
 export default function PowerChart({ power }) {
   const data = useMemo(() => power.series.map((p) => ({ day: p.hoursFromSelected / 24, power: p.wPerM2 })), [power]);
 

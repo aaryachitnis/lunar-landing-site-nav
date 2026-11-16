@@ -4,11 +4,7 @@ export const MOON_RADIUS_KM = 1737.4;
 const D2R = Math.PI / 180;
 const R2D = 180 / Math.PI;
 
-/**
- * Position on the globe mesh in moon-local (mesh) space.
- * Matches THREE.SphereGeometry UVs with the equirectangular NASA maps (u = 0 at 180°W),
- * before the mesh's rotation.y = -π/2 is applied.
- */
+/** Globe-mesh position matching SphereGeometry UVs (u = 0 at 180°W), before the mesh's rotation.y = -π/2. */
 export function latLonToMeshLocal(lat, lon, r = 1) {
   const p = lat * D2R;
   const l = lon * D2R;
@@ -43,10 +39,7 @@ export function elevAz(dir, basis) {
   return { elev, az };
 }
 
-/**
- * Destination point given a start, bearing (deg clockwise from north) and surface distance (km).
- * Used for horizon ray-marching and for local tangent-plane terrain patches (works near the poles).
- */
+/** Destination from a start, bearing (deg clockwise from north) and surface distance (km). */
 export function destination(lat, lon, bearingDeg, distKm) {
   const p1 = lat * D2R;
   const l1 = lon * D2R;
