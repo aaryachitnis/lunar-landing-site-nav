@@ -3,3 +3,5 @@ dist/
 public/textures/
 scripts/.cache/
 public/terrain/
+# Public CA certificates, not keys (see scripts/fetch-textures.mjs).
+!scripts/certs/*.pem
