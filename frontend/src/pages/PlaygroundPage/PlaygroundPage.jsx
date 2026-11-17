@@ -4,9 +4,10 @@ import { calculatePotential, ENGINE_SETTINGS, ENGINE_STEPS } from '../../data/ap
 import { formatLat, formatLon, toDMS } from '../../utils/format.js';
 import { sanitizeTime } from '../../utils/time.js';
 import { isCalculatedLocationCurrent } from './potentialSite.js';
-import PotentialForm, { validateForm } from './PotentialForm.jsx';
+import PotentialForm, { FIELD_LABELS, validateForm } from './PotentialForm.jsx';
 import TerrainMap2D from './TerrainMap2D.jsx';
 import EngineResults from './EngineResults.jsx';
+import { errorText, useAlert } from '../../components/MissionAlert/MissionAlert.jsx';
 import '../../components/SitePanel/SitePanel.css';
 import './PlaygroundPage.css';
 
@@ -38,22 +39,56 @@ export default function PlaygroundPage() {
   const [errors, setErrors] = useState({});
   const [state, setState] = useState({ result: null, error: null, busy: false });
   const runId = useRef(0);
+  const alert = useAlert();
 
   const run = useCallback(async (p) => {
     const id = ++runId.current;
     setState((s) => ({ ...s, busy: true, error: null }));
     try {
       const result = await calculatePotential(p);
-      if (id === runId.current) setState({ result, error: null, busy: false });
+      if (id !== runId.current) return;
+      setState({ result, error: null, busy: false });
+      if (result.engine.dataSource !== 'live') {
+        alert({
+          level: 'caution',
+          source: 'Playground · Power',
+          title: 'Live ephemeris unavailable',
+          message: 'JPL Horizons could not be reached, so the power figures come from a simplified geometric model. Treat them as estimates.',
+          detail: result.engine.reason,
+        });
+      }
     } catch (error) {
-      if (id === runId.current) setState((s) => ({ ...s, error, busy: false }));
+      if (id !== runId.current) return;
+      setState((s) => ({ ...s, error, busy: false }));
+      alert({
+        level: 'warning',
+        source: 'Playground · Calculate',
+        title: 'Calculation failed',
+        message: 'The potential for these coordinates could not be calculated. Check the inputs and try again.',
+        detail: errorText(error),
+      });
     }
-  }, []);
+  }, [alert]);
 
   const submit = () => {
     const { params: p, errors: errs } = validateForm(values);
     setErrors(errs);
-    if (!p) return;
+    if (!p) {
+      const bad = Object.keys(FIELD_LABELS).filter((k) => errs[k]);
+      alert({
+        level: 'caution',
+        source: 'Playground · Inputs',
+        title: 'Check the inputs',
+        message: `${bad.length === 1 ? 'One field needs' : `${bad.length} fields need`} fixing before the calculation can run:`,
+        items: bad.map((k) => ({ label: FIELD_LABELS[k], text: errs[k] })),
+        key: 'pg-inputs',
+        onClose: () => {
+          const el = document.getElementById(`pg-${bad[0]}`);
+          (el?.matches('input, select') ? el : el?.querySelector('input, select'))?.focus();
+        },
+      });
+      return;
+    }
     setParams(
       { lat: p.lat, lon: p.lon, t: p.start, days: p.durationDays, step: p.step, area: p.panelAreaM2, tile: p.tileKm },
       { replace: true },
@@ -85,8 +120,7 @@ export default function PlaygroundPage() {
         </aside>
 
         <section className="pg-right" aria-live="polite" aria-busy={busy}>
-          {error && <p className="pg-error field-error">Calculation failed: {String(error.message ?? error)}</p>}
-          {!result && !busy && !error && (
+          {!result && !busy && (
             <div className="pg-empty">
               <p className="pg-empty-title">Awaiting coordinates</p>
               <p>Enter a longitude and latitude, then press Calculate potential.</p>
@@ -102,7 +136,7 @@ export default function PlaygroundPage() {
                   <dt>Site</dt>
                   <dd>
                     {result.site.name}
-                    {result.site.backendId && <span className="muted"> backend id {result.site.backendId}</span>}
+                    {result.site.backendId && <span className="muted"> · in site list</span>}
                   </dd>
                   <dt>Latitude</dt>
                   <dd className="tabular">
@@ -142,7 +176,7 @@ export default function PlaygroundPage() {
                 </div>
                 <p className="panel-caption">
                   {result.terrain.sizeKm} × {result.terrain.sizeKm} km · {result.terrain.n}×{result.terrain.n} samples ·{' '}
-                  {Math.round(result.terrain.spacingM)} m spacing · source {result.terrain.source} (same grid as the God's-eye view)
+                  {Math.round(result.terrain.spacingM)} m spacing · {result.terrain.source}
                 </p>
               </article>
 
@@ -150,7 +184,7 @@ export default function PlaygroundPage() {
                 <div className="section-head">
                   <h3>Processing engine</h3>
                   <span className={`tag-mock${result.engine.dataSource === 'live' ? ' is-live' : ''}`}>
-                    {result.engine.dataSource === 'live' ? 'Live · JPL Horizons' : 'Mock engine'}
+                    {result.engine.dataSource === 'live' ? 'Live · JPL Horizons' : 'Simplified model'}
                   </span>
                 </div>
                 {result.engine.reason && <p className="pg-hint pg-reason">{result.engine.reason}</p>}
