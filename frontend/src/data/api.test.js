@@ -73,9 +73,61 @@ test('getSitePower requests sun events from the selected time and returns timest
     nearestEarthsetUtc: '2026-01-02T15:00:00Z',
     longestDarknessH: 14.5,
     sunlitFraction: 0.47,
+    sunAzimuthDeg: null,
+    earthAzimuthDeg: null,
   });
   assert.equal(power.windowDays, 27);
   assert.equal(power.skyError, null);
+  assert.equal(url.searchParams.get('include_terrain'), 'true');
+  assert.equal(power.terrain, null);
+});
+
+test('getSitePower maps terrain-aware Sun and Earth visibility', async () => {
+  const body = (visible, windows) => ({
+    visible,
+    azimuth_degrees: 120,
+    terrain_horizon_degrees: 1.5,
+    nearest_rise_utc: '2026-01-02T00:00:00Z',
+    nearest_set_utc: null,
+    visible_fraction: 0.6,
+    flat_visible_fraction: 0.7,
+    longest_hidden_hours: 150,
+    hidden_by_terrain_hours: 100,
+    windows,
+  });
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        site: { id: 'orig9' },
+        start: '2025-12-29T04:30:00Z',
+        end: '2026-01-28T04:30:00Z',
+        instantaneous_power_per_area_W_m2: [10, 20],
+        daily_power_generated_per_area_kWh_per_m2_day: [1.5],
+        average_power_per_24h_W_m2: 15,
+        average_power_sunlit_days_W_m2: 20,
+        sky: null,
+        terrain: {
+          dataset: 'LOLA LDEM_16',
+          resolution_m: 1895.2,
+          max_range_km: 150,
+          horizon_profile_degrees: [0, 1],
+          sun: body(false, [{ start: '2026-01-02T00:00:00Z', end: '2026-01-03T00:00:00Z', hours: 24 }]),
+          earth: body(true, []),
+        },
+        terrain_error: null,
+      }),
+      { headers: { 'content-type': 'application/json' } },
+    );
+
+  const power = await getSitePower({ id: 'orig9' }, '2026-01-01T05:30:00.000Z');
+  assert.equal(power.terrain.sun.visible, false);
+  assert.equal(power.terrain.sun.horizonDeg, 1.5);
+  assert.equal(power.terrain.sun.hiddenByTerrainH, 100);
+  assert.deepEqual(power.terrain.sun.windows, [
+    { startMs: Date.parse('2026-01-02T00:00:00Z'), endMs: Date.parse('2026-01-03T00:00:00Z'), hours: 24 },
+  ]);
+  assert.equal(power.terrain.earth.visible, true);
+  assert.equal(power.terrainError, null);
 });
 
 test('getPotentialMetrics posts unsaved coordinates to the live metrics endpoint', async () => {

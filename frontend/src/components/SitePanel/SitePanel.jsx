@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
 import { useSitePower } from '../../hooks/useSitePower.js';
-import { useSkyModel } from '../../hooks/useSkyModel.js';
 import { useTerrainPatch } from '../../hooks/useTerrainPatch.js';
 import { formatLat, formatLon, toDMS } from '../../utils/format.js';
 import { MAX_TIME_MS, MIN_TIME_MS, clampTime } from '../../utils/time.js';
@@ -10,6 +9,8 @@ import TerrainView from '../TerrainView/TerrainView.jsx';
 import TimePicker from '../TimePicker/TimePicker.jsx';
 import { PowerTiles, SkyTiles } from '../MetricTiles/MetricTiles.jsx';
 import PowerChart from '../PowerChart/PowerChart.jsx';
+import UserBadge, { USER_ADDED_NOTE } from '../UserBadge/UserBadge.jsx';
+import VisibilityTimeline from '../VisibilityTimeline/VisibilityTimeline.jsx';
 import './SitePanel.css';
 
 const TERRAIN = { sizeKm: 80, n: 64 };
@@ -45,7 +46,6 @@ function InfoTip({ text }) {
 
 export default function SitePanel({ site, time, onTimeChange, onClose }) {
   const power = useSitePower(site, time);
-  const sky = useSkyModel(site, time);
   const terrain = useTerrainPatch(site, TERRAIN);
   const cat = SITE_CATEGORIES[site.category];
   const [altStat, setAltStat] = useState('meanM');
@@ -66,13 +66,19 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
       <header className="panel-header">
         <div>
           <div className="panel-badges">
-            <span className="badge" style={{ '--c': cat?.color }}>
-              <span className="cat-dot" />
-              {cat?.label}
-            </span>
+            {site.userAdded ? (
+              <UserBadge label />
+            ) : (
+              <span className="badge" style={{ '--c': cat?.color }}>
+                <span className="cat-dot" />
+                {cat?.label}
+              </span>
+            )}
           </div>
           <h2>{site.name}</h2>
-          <p className="panel-sub">{[site.region, site.agency].filter(Boolean).join(' · ')}</p>
+          <p className="panel-sub">
+            {site.userAdded ? USER_ADDED_NOTE : [site.region, site.agency].filter(Boolean).join(' · ')}
+          </p>
           <Link className="stand-here" to={`/lunarium?site=${encodeURIComponent(site.id)}&t=${encodeURIComponent(time)}`}>
             🧑‍🚀 Stand here · look at the horizon →
           </Link>
@@ -121,7 +127,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
 
       <section className="panel-section">
         <h3>Terrain · bird's-eye</h3>
-        <TerrainView patch={patch} sunAzimuth={sky.data?.now.sunAzimuth ?? null} loading={terrain.loading} />
+        <TerrainView patch={patch} sunAzimuth={power.data?.sky?.sunAzimuthDeg ?? null} loading={terrain.loading} />
         {patch && (
           <p className="panel-caption tabular">
             {patch.sizeKm} × {patch.sizeKm} km · {patch.n}×{patch.n} vertices · {Math.round(patch.spacingM)} m spacing ·
@@ -156,12 +162,15 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
             <PowerChart power={power.data} />
           </div>
         )}
+        <Link className="panel-caption guide-link" to="/guide#metrics">
+          What do these numbers mean? →
+        </Link>
       </section>
 
       <section className="panel-section">
         <h3>
           Sun &amp; Earth
-          <span className="tag-mock is-live" title="JPL Horizons metrics; terrain obstruction is not included">
+          <span className="tag-mock is-live" title="JPL Horizons positions, judged against the NASA LOLA terrain horizon">
             Live
           </span>
         </h3>
@@ -172,8 +181,11 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
             {power.data.skyError && (
               <p className="field-error">Live sky metrics unavailable: {power.data.skyError}</p>
             )}
+            <VisibilityTimeline terrain={power.data.terrain} startMs={Date.parse(time)} endMs={Date.parse(power.data.end)} />
             <SkyTiles
               sky={power.data.sky}
+              terrain={power.data.terrain}
+              terrainError={power.data.terrainError}
               sunEvents={power.data}
               selectedTime={time}
               windowDays={power.data.windowDays}
