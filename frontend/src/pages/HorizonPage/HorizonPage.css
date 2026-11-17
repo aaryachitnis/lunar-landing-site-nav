@@ -181,7 +181,7 @@ select.hz-chip option { background: #111; }
 .hz-tb-tick.landing { color: var(--text-primary); }
 .hz-tb-head { position: absolute; top: -3px; bottom: 10px; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 6px #fff; pointer-events: none; }
 
-.hz-loading, .hz-toast {
+.hz-loading {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -193,8 +193,6 @@ select.hz-chip option { background: #111; }
   font-size: 13px;
   z-index: 4;
 }
-.hz-loading.error { color: var(--critical); }
-.hz-toast { top: auto; bottom: 120px; transform: translateX(-50%); max-width: 80vw; text-align: center; }
 
 /* ── Phones (portrait or landscape) ─────────────────────────────────────────
    Same breakpoint as the compact nav in layouts/AppLayout.css and isCompact() in HorizonPage.jsx.
@@ -231,7 +229,6 @@ select.hz-chip option { background: #111; }
   .hz-tb-tracks { margin-top: 4px; }
   .hz-tb-row { height: 15px; }
   .hz-tb-track { height: 10px; }
-  .hz-toast { bottom: 140px; }
 }
 
 /* Phone portrait: the compass drops below the top chips instead of colliding with them. */

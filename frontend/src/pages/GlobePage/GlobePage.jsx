@@ -4,6 +4,7 @@ import SiteList from '../../components/SiteList/SiteList.jsx';
 import SitePanel from '../../components/SitePanel/SitePanel.jsx';
 import { useSites } from '../../hooks/useSites.js';
 import { useSelectedSite } from '../../hooks/useSelectedSite.js';
+import { errorText, useErrorAlert } from '../../components/MissionAlert/MissionAlert.jsx';
 import './GlobePage.css';
 
 const PANEL_W = 420;
@@ -33,6 +34,13 @@ export default function GlobePage() {
   }, []);
 
   const sites = useMemo(() => fetchedSites ?? [], [fetchedSites]);
+  useErrorAlert(error, (e) => ({
+    level: 'warning',
+    source: 'Landing sites · Catalogue',
+    title: 'Site catalogue unavailable',
+    message: 'The landing-site list could not be loaded from the server. Reload the page, or use the Playground to enter coordinates directly.',
+    detail: errorText(e),
+  }));
 
   // Also accept Lunarium ids (apollo-11) and the backend's old ids (site-3) from shared links.
   const selectedSite = sites.find((s) => s.id === siteId) ?? sites.find((s) => s.terrainId === siteId || s.legacyId === siteId) ?? null;

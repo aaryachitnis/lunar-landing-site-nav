@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MAX_ERA_YEAR, MONTH_NAMES, daysInMonth, formatTime, fromParts, toAstroYear, toParts } from '../../utils/time.js';
+import { FieldAlert } from '../MissionAlert/MissionAlert.jsx';
 import './TimePicker.css';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -75,7 +76,7 @@ export default function TimePicker({ value, onChange }) {
         <span className="muted">UTC</span>
       </div>
       {error ? (
-        <p className="field-error">{error}</p>
+        <FieldAlert>{error}</FieldAlert>
       ) : (
         <p className="time-picker-note muted">
           {formatTime(Date.parse(value))} · range 9999 BC – 9999 AD
