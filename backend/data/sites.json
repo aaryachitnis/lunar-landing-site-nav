@@ -90,21 +90,81 @@
     "agency": "NASA"
   },
   {
+    "id": "orig10",
+    "name": "IM-1 Odysseus (Malapert A)",
+    "loc": [
+      -80.13,
+      1.44
+    ],
+    "desc": "Intuitive Machines' first CLPS lander, which touched down near Malapert A crater in 2024. The first US landing since Apollo and the first commercial lander on the Moon.",
+    "agency": "Intuitive Machines"
+  },
+  {
+    "id": "orig11",
+    "name": "IM-2 Athena (Mons Mouton)",
+    "loc": [
+      -84.79,
+      29.2
+    ],
+    "desc": "Intuitive Machines' second CLPS lander, sent to the Mons Mouton region in 2025 to test drilling for ice near the south pole.",
+    "agency": "Intuitive Machines"
+  },
+  {
+    "id": "orig12",
+    "name": "Blue Ghost M1 (Mare Crisium)",
+    "loc": [
+      18.56,
+      61.81
+    ],
+    "desc": "Firefly Aerospace's first CLPS lander, which landed in Mare Crisium in 2025 and operated through a full lunar day.",
+    "agency": "Firefly Aerospace"
+  },
+  {
+    "id": "orig13",
+    "name": "Chandrayaan-3 (Vikram landing site)",
+    "loc": [
+      -69.37,
+      32.32
+    ],
+    "desc": "ISRO's Vikram lander and Pragyan rover, which landed in the high southern latitudes in 2023. India's first soft landing on the Moon.",
+    "agency": "ISRO"
+  },
+  {
+    "id": "orig14",
+    "name": "SLIM (Shioli crater)",
+    "loc": [
+      -13.32,
+      25.25
+    ],
+    "desc": "JAXA's Smart Lander for Investigating Moon, which landed near Shioli crater in 2024 to demonstrate pinpoint landing.",
+    "agency": "JAXA"
+  },
+  {
+    "id": "orig15",
+    "name": "Chang'e 4 (Von Kármán crater)",
+    "loc": [
+      -45.46,
+      177.59
+    ],
+    "desc": "CNSA's lander and Yutu-2 rover in Von Kármán crater, the first soft landing on the lunar far side (2019). Direct-to-Earth contact is impossible here; it relies on a relay satellite.",
+    "agency": "CNSA"
+  },
+  {
+    "id": "orig16",
+    "name": "Chang'e 6 (Apollo basin)",
+    "loc": [
+      -41.64,
+      -153.99
+    ],
+    "desc": "CNSA's far-side sample-return mission, which landed in the Apollo basin in 2024. Like Chang'e 4, it needs a relay satellite to talk to Earth.",
+    "agency": "CNSA"
+  },
+  {
     "id": "custom-e533e9e805d84c359a5f8f6cdcc03ff0",
     "name": "Lunar Null Island",
     "loc": [
       0.0,
       0.0
-    ],
-    "desc": "",
-    "agency": "Custom"
-  },
-  {
-    "id": "custom-e81bbf8864a44bcab526bd061a03276d",
-    "name": "Test",
-    "loc": [
-      45.0,
-      45.0
     ],
     "desc": "",
     "agency": "Custom"
