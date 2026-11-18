@@ -2,8 +2,18 @@ import { useState } from 'react';
 import TimePicker from '../../components/TimePicker/TimePicker.jsx';
 import { addSite, ENGINE_SETTINGS, ENGINE_STEPS, matchBackendSite } from '../../data/api.js';
 import { useSites } from '../../hooks/useSites.js';
+import { errorText, FieldAlert, useAlert } from '../../components/MissionAlert/MissionAlert.jsx';
 
 const TILE_SIZES = [20, 40, 80];
+
+/** Form order, so the input summary and focus-on-close follow what the user sees. */
+export const FIELD_LABELS = {
+  lon: 'Longitude',
+  lat: 'Latitude',
+  start: 'Start time',
+  durationDays: 'Duration',
+  panelAreaM2: 'Panel area',
+};
 
 /** Values stay strings so inputs can be mid-edit; validateForm() parses them. */
 export default function PotentialForm({
@@ -15,7 +25,8 @@ export default function PotentialForm({
   canAddSite,
 }) {
   const [siteRefreshKey, setSiteRefreshKey] = useState(0);
-  const [saveState, setSaveState] = useState({ busy: false, error: null, message: null });
+  const [saveState, setSaveState] = useState({ busy: false, message: null });
+  const alert = useAlert();
   const backend = useSites(siteRefreshKey);
   const latitude = Number(values.lat);
   const rawLongitude = Number(values.lon);
@@ -24,12 +35,9 @@ export default function PotentialForm({
   const match = hasCoordinates
     ? matchBackendSite(backend.data, latitude, longitude)
     : null;
-  const source = match
-    ? { live: true, text: `Live metrics: ${match.name}` }
-    : {
-        live: true,
-        text: 'Custom coordinates use live backend metrics; mock fallback if unavailable',
-      };
+  const sourceText = match
+    ? `Saved site: ${match.name}`
+    : 'Custom coordinates · live JPL Horizons data';
 
   const saveCustomSite = async () => {
     const name = String(values.siteName ?? '').trim();
@@ -43,24 +51,29 @@ export default function PotentialForm({
     }
     if (match) errors.push('These coordinates are already in the site list.');
     if (errors.length) {
-      setSaveState({ busy: false, error: errors.join(' '), message: null });
+      alert({
+        level: 'caution',
+        source: 'Playground · Site list',
+        title: 'This site cannot be added yet',
+        message: 'Fix these first:',
+        items: errors,
+      });
       return;
     }
 
-    setSaveState({ busy: true, error: null, message: null });
+    setSaveState({ busy: true, message: null });
     try {
       const saved = await addSite({ name, lat: latitude, lon: longitude });
       setSiteRefreshKey((key) => key + 1);
-      setSaveState({
-        busy: false,
-        error: null,
-        message: `Added ${saved.fullName} to the site list.`,
-      });
+      setSaveState({ busy: false, message: `Added ${saved.fullName} to the site list.` });
     } catch (error) {
-      setSaveState({
-        busy: false,
-        error: String(error.message ?? error),
-        message: null,
+      setSaveState({ busy: false, message: null });
+      alert({
+        level: 'warning',
+        source: 'Playground · Site list',
+        title: 'Could not save the site',
+        message: 'The server did not accept the new site. Check your connection and try again.',
+        detail: errorText(error),
       });
     }
   };
@@ -69,14 +82,16 @@ export default function PotentialForm({
     <label className="pg-field">
       <span className="pg-label">{label}</span>
       <input
+        id={`pg-${name}`}
         className="pg-input tabular"
         inputMode="decimal"
         value={values[name]}
         onChange={(e) => onChange({ [name]: e.target.value })}
         aria-invalid={!!errors[name]}
+        aria-describedby={errors[name] ? `pg-${name}-error` : undefined}
         {...props}
       />
-      {errors[name] && <span className="field-error">{errors[name]}</span>}
+      <FieldAlert id={`pg-${name}-error`}>{errors[name]}</FieldAlert>
     </label>
   );
 
@@ -94,7 +109,7 @@ export default function PotentialForm({
       </div>
 
       <label className="pg-field">
-        <span className="pg-label">Saved site (live data)</span>
+        <span className="pg-label">Saved site</span>
         <select
           className="pg-input"
           value={match?.id ?? ''}
@@ -107,7 +122,7 @@ export default function PotentialForm({
           <option value="">{backend.loading ? 'Loading sites…' : 'Custom coordinates'}</option>
           {backend.data?.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.name}
+              {s.userAdded ? `${s.name} (user-added)` : s.name}
             </option>
           ))}
         </select>
@@ -115,15 +130,15 @@ export default function PotentialForm({
 
       {field('lon', 'Longitude (°E)', { placeholder: '-180 … 180, east positive' })}
       {field('lat', 'Latitude (°N)', { placeholder: '-90 … 90, north positive' })}
-      <p className={`pg-source ${source.live ? 'is-live' : ''}`} role="status">
-        <span aria-hidden="true">{source.live ? '●' : '○'}</span> {source.text}
+      <p className="pg-source is-live" role="status">
+        <span aria-hidden="true">●</span> {sourceText}
       </p>
 
-      <fieldset className="pg-fieldset">
+      <fieldset className="pg-fieldset" id="pg-start" aria-describedby={errors.start ? 'pg-start-error' : undefined}>
         <legend className="pg-label">Analysis window</legend>
         <span className="pg-sublabel">Start (UTC)</span>
         <TimePicker value={values.start} onChange={(iso) => onChange({ start: iso })} />
-        {errors.start && <span className="field-error">{errors.start}</span>}
+        <FieldAlert id="pg-start-error">{errors.start}</FieldAlert>
         <div className="pg-row">
           {field('durationDays', 'Duration (days)', { placeholder: '1 … 60' })}
           <label className="pg-field">
@@ -143,7 +158,7 @@ export default function PotentialForm({
         <legend className="pg-label">Solar array</legend>
         {field('panelAreaM2', 'Panel area (m²)', { placeholder: 'e.g. 2' })}
         <p className="pg-hint">
-          Efficiency {Math.round(ENGINE_SETTINGS.panelEfficiency * 100)}% (engine setting) · horizontal panel
+          {Math.round(ENGINE_SETTINGS.panelEfficiency * 100)}% efficient · flat, horizontal panel
         </p>
       </fieldset>
 
@@ -175,9 +190,8 @@ export default function PotentialForm({
         {!canAddSite && !match && (
           <p className="pg-hint">Calculate potential for these coordinates before saving.</p>
         )}
-        {saveState.error && <p className="field-error" role="alert">{saveState.error}</p>}
         {saveState.message && <p className="pg-hint" role="status">{saveState.message}</p>}
-        {backend.error && <p className="pg-hint">Site list could not be loaded; saving requires the backend.</p>}
+        {backend.error && <p className="pg-hint">The site list is unavailable, so new sites can't be saved right now.</p>}
       </div>
     </form>
   );

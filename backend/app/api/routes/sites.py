@@ -6,11 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.config import Settings
 from app.dependencies import get_app_settings
 from core.models import (
+    BodyTerrainVisibility,
+    CommunicationMetricsResponse,
     CustomMetricsRequest,
     PowerMetricsResponse,
     SkyMetricsResponse,
     SiteCreateRequest,
     SiteSummary,
+    SurfaceRoughnessResponse,
+    TerrainSkyResponse,
+    VisibilityWindow,
 )
 from core.utils import HorizonsLocation, format_utc, get_lunar_sites_loc, parse_datetime
 from data import (
@@ -30,6 +35,11 @@ from services import (
     fetch_solar_ephemeris,
     find_nearest_sunrise_sunset,
 )
+from services.mountain_visibility import analyse_site, check_window
+from services.power_services import _julian_date_to_utc
+from services.surface_roughness import analyse_all_sites
+from services.terrain_height import DEFAULT_PPD, VALID_PPD, load_elevation_grid
+from services.terrain_sky import BodyVisibility, TerrainSky, calculate_terrain_sky
 
 router = APIRouter(prefix="/sites", tags=["sites"])
 _DEFAULT_HORIZONS_STEP = get_app_settings().default_horizons_step
@@ -55,6 +65,35 @@ def resolve_site(site_id: str) -> SiteSummary:
     if site is None:
         raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found.")
     return _site_summary(site)
+
+
+def _body_response(body: BodyVisibility) -> BodyTerrainVisibility:
+    return BodyTerrainVisibility(
+        visible=body.visible,
+        azimuth_degrees=body.azimuth_degrees,
+        terrain_horizon_degrees=body.terrain_horizon_degrees,
+        nearest_rise_utc=format_utc(body.nearest_rise_utc) if body.nearest_rise_utc else None,
+        nearest_set_utc=format_utc(body.nearest_set_utc) if body.nearest_set_utc else None,
+        visible_fraction=body.visible_fraction,
+        flat_visible_fraction=body.flat_visible_fraction,
+        longest_hidden_hours=body.longest_hidden_hours,
+        hidden_by_terrain_hours=body.hidden_by_terrain_hours,
+        windows=[
+            VisibilityWindow(start=format_utc(a), end=format_utc(b), hours=h)
+            for a, b, h in body.windows
+        ],
+    )
+
+
+def _terrain_response(terrain: TerrainSky) -> TerrainSkyResponse:
+    return TerrainSkyResponse(
+        dataset=terrain.dataset,
+        resolution_m=terrain.resolution_m,
+        max_range_km=terrain.max_range_km,
+        horizon_profile_degrees=terrain.horizon_profile_degrees,
+        sun=_body_response(terrain.sun),
+        earth=_body_response(terrain.earth),
+    )
 
 
 @router.get("", response_model=list[SiteSummary])
@@ -113,6 +152,7 @@ def _calculate_metrics(
     step: str,
     settings: Settings,
     include_sky: bool = False,
+    include_terrain: bool = False,
 ) -> PowerMetricsResponse:
     start_horizons = start_datetime.strftime("%Y-%m-%d %H:%M")
     end_horizons = end_datetime.strftime("%Y-%m-%d %H:%M")
@@ -130,7 +170,7 @@ def _calculate_metrics(
 
     earth_ephemeris = None
     sky_error = None
-    if include_sky:
+    if include_sky or include_terrain:
         try:
             earth_ephemeris = fetch_earth_ephemeris(
                 location,
@@ -173,6 +213,27 @@ def _calculate_metrics(
         except ValueError as exc:
             sky_error = f"Invalid ephemeris data returned by Horizons: {exc}"
 
+    terrain = None
+    terrain_error = None
+    if include_terrain:
+        if earth_ephemeris is None:
+            terrain_error = sky_error or "Earth ephemeris is unavailable."
+        else:
+            try:
+                terrain = _terrain_response(calculate_terrain_sky(
+                    load_elevation_grid(DEFAULT_PPD),
+                    site.lat,
+                    site.lon,
+                    ephemeris,
+                    earth_ephemeris,
+                    events_start_datetime,
+                    end_datetime,
+                ))
+            except (OSError, RuntimeError) as exc:
+                terrain_error = f"Terrain data is unavailable: {exc}"
+            except ValueError as exc:
+                terrain_error = f"Could not calculate terrain visibility: {exc}"
+
     duration_hours = (end_datetime - start_datetime).total_seconds() / 3600.0
     average_power_24h = (
         sum(daily_energy) * 1000.0 / duration_hours if duration_hours > 0 else 0.0
@@ -209,11 +270,15 @@ def _calculate_metrics(
                 ),
                 longest_darkness_hours=sky.longest_darkness_hours,
                 sunlit_fraction=sky.sunlit_fraction,
+                sun_azimuth_degrees=sky.sun_azimuth_degrees,
+                earth_azimuth_degrees=sky.earth_azimuth_degrees,
             )
             if sky is not None
             else None
         ),
         sky_error=sky_error,
+        terrain=terrain,
+        terrain_error=terrain_error,
         instantaneous_power_per_area_W_m2=[
             float(value) for value in instantaneous_power
         ],
@@ -243,6 +308,10 @@ def get_site_metrics(
         bool,
         Query(description="Include live Sun/Earth metrics and Earth rise/set times."),
     ] = False,
+    include_terrain: Annotated[
+        bool,
+        Query(description="Include Sun/Earth visibility over the LOLA terrain horizon."),
+    ] = False,
 ) -> PowerMetricsResponse:
     site = resolve_site(site_id)
     start_datetime, end_datetime, events_start_datetime, step = _parse_metrics_window(
@@ -261,6 +330,7 @@ def get_site_metrics(
         step,
         settings,
         include_sky,
+        include_terrain,
     )
 
 
@@ -289,4 +359,98 @@ def get_custom_site_metrics(
         events_start_datetime,
         step,
         settings,
+    )
+
+
+@router.get(
+    "/surface-roughness",
+    response_model=SurfaceRoughnessResponse,
+    description=(
+        "Mean slope, maximum slope, and detrended RMS surface roughness "
+        "for every catalog site, including the LOLA dataset used."
+    ),
+)
+def get_surface_roughness() -> SurfaceRoughnessResponse:
+    try:
+        report = analyse_all_sites()
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=f"Terrain data is unavailable: {exc}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=f"Could not calculate surface roughness: {exc}") from exc
+    return SurfaceRoughnessResponse(**report)
+
+
+_MAX_FINE_SAMPLES = 200_000
+
+
+@router.get("/{site_id}/communications", response_model=CommunicationMetricsResponse)
+def get_site_communications(
+    site_id: str,
+    start: str = Query(..., description="ISO 8601 start time in UTC."),
+    end: str = Query(..., description="ISO 8601 end time in UTC."),
+    step: str = Query("1h", min_length=2, max_length=16),
+    terrain_ppd: int = Query(DEFAULT_PPD),
+    max_range_km: float = Query(150.0, gt=0, le=1000),
+    mountain_threshold_deg: float = Query(1.0, ge=0),
+    min_elevation_deg: float = Query(0.0, ge=-90, le=90),
+    count_partial: bool = Query(True),
+    fine_step_min: float = Query(1.0, ge=0.1, le=60),
+) -> CommunicationMetricsResponse:
+    """Full Earth-visibility report over LOLA terrain, including mountain sectors."""
+    site = resolve_site(site_id)
+    if terrain_ppd not in VALID_PPD:
+        raise HTTPException(status_code=400, detail=f"terrain_ppd must be one of {VALID_PPD}.")
+    try:
+        start_datetime = parse_datetime(start)
+        end_datetime = parse_datetime(end)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    step = step.strip()
+    if end_datetime <= start_datetime:
+        raise HTTPException(status_code=400, detail="End time must be later than start time.")
+    try:
+        check_window(start_datetime, end_datetime, step)
+    except (ValueError, IndexError, ZeroDivisionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if (end_datetime - start_datetime).total_seconds() / (fine_step_min * 60.0) > _MAX_FINE_SAMPLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"The requested interval would require more than {_MAX_FINE_SAMPLES} visibility samples.",
+        )
+
+    try:
+        analysis = analyse_site(
+            load_elevation_grid(terrain_ppd),
+            site.lat,
+            site.lon,
+            start_datetime,
+            end_datetime,
+            step,
+            max_range_km,
+            mountain_threshold_deg,
+            min_elevation_deg,
+            count_partial,
+            fine_step_min,
+        )
+    except HorizonsUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except HorizonsRequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=f"Terrain data is unavailable: {exc}") from exc
+
+    analysis["windows"] = [
+        {
+            "start": format_utc(_julian_date_to_utc(float(a))),
+            "end": format_utc(_julian_date_to_utc(float(b))),
+            "hours": float(h),
+        }
+        for a, b, h in analysis["windows"]
+    ]
+    return CommunicationMetricsResponse(
+        site=site,
+        start=format_utc(start_datetime),
+        end=format_utc(end_datetime),
+        step=step,
+        analysis=analysis,
     )

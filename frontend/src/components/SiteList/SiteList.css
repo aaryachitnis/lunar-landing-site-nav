@@ -39,6 +39,7 @@
 .site-row-name { min-width: 0; display: flex; flex-direction: column; }
 .site-row-name, .site-row-region { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .site-row-region { color: var(--text-muted); font-size: 12px; }
+.site-row-title { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .site-row-coords { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .field-error { color: var(--critical); font-size: 12px; margin: 6px 0 0; }
 .muted { color: var(--text-muted); }
