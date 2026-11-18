@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useMoonScene } from '../../hooks/useMoonScene.js';
 import { useLetThereBeLight } from '../../hooks/useLetThereBeLight.js';
 import LightToggle from '../LightToggle/LightToggle.jsx';
+import { useErrorAlert } from '../MissionAlert/MissionAlert.jsx';
 import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
 import './MoonView.css';
 
@@ -10,6 +11,13 @@ export default function MoonView({ sites, selectedSite, onSelect, insets }) {
   const markerEls = useRef(new Map());
   const { sceneRef, status } = useMoonScene(containerRef);
   const { lit, toggle } = useLetThereBeLight(sceneRef);
+  useErrorAlert(status.error, (e) => ({
+    level: 'warning',
+    source: 'Landing sites · Globe',
+    title: 'Lunar maps failed to load',
+    message: 'The globe imagery could not be downloaded. Site details still work; reload the page to retry the globe.',
+    detail: import.meta.env.DEV ? `${e} Dev: run "npm run textures" in frontend/.` : e,
+  }));
 
   // Register marker elements with the scene (it positions them every frame).
   useEffect(() => {

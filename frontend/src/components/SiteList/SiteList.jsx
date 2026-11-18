@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { SITE_CATEGORIES } from '../../data/siteCatalog.js';
 import { formatLat, formatLon } from '../../utils/format.js';
+import UserBadge, { PersonIcon } from '../UserBadge/UserBadge.jsx';
 import './SiteList.css';
 
 export default function SiteList({ sites, selectedId, onSelect, loading, error, collapsed, onToggle }) {
@@ -34,11 +35,11 @@ export default function SiteList({ sites, selectedId, onSelect, loading, error, 
           />
           <div className="site-groups">
             {loading && <p className="muted">Loading sites…</p>}
-            {error && <p className="field-error">{String(error.message ?? error)}</p>}
+            {error && <p className="field-error">Site list unavailable.</p>}
             {groups.map((g) => (
               <section key={g.key}>
                 <h3>
-                  <span className="cat-dot" style={{ '--c': g.color }} />
+                  {g.key === 'user-added' ? <PersonIcon size={10} /> : <span className="cat-dot" style={{ '--c': g.color }} />}
                   {g.label}
                 </h3>
                 <ul>
@@ -46,7 +47,10 @@ export default function SiteList({ sites, selectedId, onSelect, loading, error, 
                     <li key={s.id}>
                       <button className={`site-row${s.id === selectedId ? ' active' : ''}`} onClick={() => onSelect(s.id)}>
                         <span className="site-row-name">
-                          {s.name}
+                          <span className="site-row-title">
+                            {s.name}
+                            {s.userAdded && <UserBadge />}
+                          </span>
                           {s.region && <span className="site-row-region">{s.region}</span>}
                         </span>
                         <span className="site-row-coords tabular">

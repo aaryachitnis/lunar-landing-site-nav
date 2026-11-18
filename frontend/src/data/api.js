@@ -69,6 +69,7 @@ export function getSitePower(site, dateISO) {
       step: `${stepHours}hour`,
       events_from: new Date(t0).toISOString(),
       include_sky: 'true',
+      include_terrain: 'true',
     });
     // Samples are evenly spaced from `start`; the response carries values only.
     const startMs = Date.parse(res.start);
@@ -103,13 +104,42 @@ export function getSitePower(site, dateISO) {
             nearestEarthsetUtc: res.sky.nearest_earthset_utc,
             longestDarknessH: res.sky.longest_darkness_hours,
             sunlitFraction: res.sky.sunlit_fraction,
+            sunAzimuthDeg: res.sky.sun_azimuth_degrees ?? null,
+            earthAzimuthDeg: res.sky.earth_azimuth_degrees ?? null,
           }
         : null,
       skyError: res.sky_error ?? null,
+      terrain: res.terrain ? terrainSky(res.terrain) : null,
+      terrainError: res.terrain_error ?? null,
       windowDays: daysAfter,
-      source: 'JPL Horizons via backend',
+      source: 'JPL Horizons',
     };
   });
+}
+
+const terrainBody = (b) => ({
+  visible: b.visible,
+  azimuthDeg: b.azimuth_degrees,
+  horizonDeg: b.terrain_horizon_degrees,
+  riseUtc: b.nearest_rise_utc,
+  setUtc: b.nearest_set_utc,
+  visibleFraction: b.visible_fraction,
+  flatVisibleFraction: b.flat_visible_fraction,
+  longestHiddenH: b.longest_hidden_hours,
+  hiddenByTerrainH: b.hidden_by_terrain_hours,
+  windows: b.windows.map((w) => ({ startMs: Date.parse(w.start), endMs: Date.parse(w.end), hours: w.hours })),
+});
+
+/** Sun/Earth visibility over the LOLA terrain horizon. */
+function terrainSky(t) {
+  return {
+    dataset: t.dataset,
+    resolutionM: t.resolution_m,
+    maxRangeKm: t.max_range_km,
+    horizonProfileDeg: t.horizon_profile_degrees,
+    sun: terrainBody(t.sun),
+    earth: terrainBody(t.earth),
+  };
 }
 
 function valueAt(series, t) {
@@ -189,7 +219,7 @@ export async function getPotentialMetrics({ lat, lon, start, end, step }) {
     return {
       dataSource: 'mock',
       site,
-      reason: `Live data failed (${error.message}). Showing mock values.`,
+      reason: `Live data failed (${error.message}). Showing simplified model values.`,
       response: mockEnginePotential({ lat, lon, start, end, step }),
     };
   }
@@ -220,7 +250,7 @@ export async function calculatePotential({ lat, lon, start, durationDays, step, 
     engine: {
       ...engine,
       efficiency: ENGINE_SETTINGS.panelEfficiency,
-      source: engine.dataSource === 'live' ? 'JPL Horizons via backend' : 'Mock engine (simplified geometry)',
+      source: engine.dataSource === 'live' ? 'JPL Horizons' : 'Simplified geometric model',
       // Samples are evenly spaced from `start`; the response carries values only.
       times: engine.response.instantaneous_power_per_area_W_m2.map((_, i) => t0 + i * stepH * HOUR_MS),
     },

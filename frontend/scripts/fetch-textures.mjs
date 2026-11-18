@@ -10,7 +10,9 @@
 // Usage: node scripts/fetch-textures.mjs [--if-missing] [--force]
 
 import fs from 'node:fs';
+import https from 'node:https';
 import path from 'node:path';
+import tls from 'node:tls';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { fromArrayBuffer } from 'geotiff';
@@ -58,18 +60,36 @@ if (args.has('--if-missing') && OUTPUTS.every((f) => fs.existsSync(path.join(OUT
 fs.mkdirSync(CACHE, { recursive: true });
 fs.mkdirSync(OUT, { recursive: true });
 
+// NASA SVS omits its Let's Encrypt intermediates, so fetch() can't verify it; https.get with them added can.
+const CA = [...tls.rootCertificates, fs.readFileSync(path.join(here, 'certs', 'lets-encrypt-yr.pem'), 'utf8')];
+function get(url) {
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, { ca: CA }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          resolve(get(new URL(res.headers.location, url).href));
+        } else resolve(res);
+      })
+      .on('error', reject);
+  });
+}
+
 async function download(name) {
   const dest = path.join(CACHE, name);
   if (fs.existsSync(dest) && !args.has('--force')) return dest;
   const url = `${BASE}/${name}`;
   console.log(`[textures] downloading ${url}`);
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Download failed (${res.status}) for ${url}`);
-  const total = Number(res.headers.get('content-length')) || 0;
+  const res = await get(url);
+  if (res.statusCode !== 200) {
+    res.resume();
+    throw new Error(`Download failed (${res.statusCode}) for ${url}`);
+  }
+  const total = Number(res.headers['content-length']) || 0;
   const chunks = [];
   let got = 0;
   let lastPct = -1;
-  for await (const chunk of res.body) {
+  for await (const chunk of res) {
     chunks.push(chunk);
     got += chunk.length;
     const pct = total ? Math.floor((got / total) * 100) : -1;

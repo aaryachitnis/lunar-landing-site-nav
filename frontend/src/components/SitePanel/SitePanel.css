@@ -92,3 +92,4 @@
   text-transform: uppercase;
 }
 .stand-here:hover { box-shadow: var(--glow); }
+.guide-link { display: inline-block; margin-top: 8px; color: var(--accent); text-decoration: none; }

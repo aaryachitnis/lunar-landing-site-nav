@@ -76,6 +76,6 @@ export function samplePatch(grid, lat, lon, { sizeKm = 80, n = 128 } = {}) {
     roughnessM: Math.sqrt(sq / count),
     centralKm: (c1 - c0 - 1) * step,
     sourceResolutionM: grid.resolutionM,
-    source: `${grid.dataset} (bilinear)`,
+    source: `NASA ${grid.dataset}`,
   };
 }

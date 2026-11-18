@@ -40,6 +40,8 @@ class SkyMetrics:
     nearest_earthset_utc: datetime | None
     longest_darkness_hours: float
     sunlit_fraction: float
+    sun_azimuth_degrees: float | None = None
+    earth_azimuth_degrees: float | None = None
 
 
 def find_nearest_sunrise_sunset(
@@ -160,7 +162,23 @@ def calculate_sky_metrics(
         nearest_earthset_utc=earthset,
         longest_darkness_hours=longest_darkness_seconds / 3600.0,
         sunlit_fraction=min(1.0, max(0.0, sunlit_fraction)),
+        sun_azimuth_degrees=_azimuth_at(sun_ephemeris, sun_timestamps_jd, start_jd),
+        earth_azimuth_degrees=_azimuth_at(earth_ephemeris, earth_timestamps_jd, start_jd),
     )
+
+
+def _azimuth_at(
+    ephemeris: EphemerisData, timestamps_jd: NDArray[np.float64], timestamp_jd: float
+) -> float | None:
+    """Azimuth interpolated across north correctly; None if the ephemeris has no AZ column."""
+    try:
+        azimuth = _column_as_floats(ephemeris, "AZ")
+    except ValueError:
+        return None
+    if azimuth.shape != timestamps_jd.shape:
+        return None
+    unwrapped = np.degrees(np.unwrap(np.radians(azimuth)))
+    return float(np.interp(timestamp_jd, timestamps_jd, unwrapped) % 360.0)
 
 
 def _horizon_samples(

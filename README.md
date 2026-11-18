@@ -23,6 +23,7 @@ Schedules slip, so planners need to re-check nearby sites and other dates quickl
 |---|---|
 | **Landing Sites** | A 3D globe built from NASA imagery, with historic and candidate sites. Each site's panel shows location, elevation, slope, roughness, bird's-eye terrain, solar power with a 30-day chart, and Sun and Earth visibility. |
 | **Lunarium** | Stand at a site in first person and watch the Sun and Earth move across the real terrain horizon. On a phone, point the device around to look. |
+| **Guide** | A plain-language explainer: why the poles are hard, how Earth visibility works, and what every metric means. |
 | **Playground** | Enter any coordinates and click **Calculate potential** to get site info, a 2D terrain map and power results. Add the location to the site catalogue if it's worth keeping. |
 
 The selected site and time live in the URL, so any view can be shared as a link.
@@ -31,9 +32,9 @@ The selected site and time live in the URL, so any view can be shared as a link.
 
 | Challenge objective | How the tool covers it |
 |---|---|
-| Site selection | A curated catalogue of Apollo sites and Artemis III south-pole candidates. Lunarium adds CLPS landers (IM-1, IM-2, Blue Ghost) and international missions (Chandrayaan-3, SLIM, Chang'e 4 and 6). The Playground takes any coordinates and can add them to the catalogue. |
+| Site selection | A curated catalogue of Apollo sites, Artemis III south-pole candidates, CLPS landers (IM-1, IM-2, Blue Ghost) and international missions (Chandrayaan-3, SLIM, Chang'e 4 and 6). The Playground takes any coordinates and can add them to the catalogue, where they are marked as user-added. |
 | Date and time flexibility | A UTC time picker from 9999 BC to 9999 AD in the site panel and the Playground. The chosen time carries into Lunarium. |
-| Sun and Earth relative to the horizon | Live Sun and Earth altitude and visibility per site, plus time to sunset/sunrise and Earthset/Earthrise. Lunarium shows both bodies over the real terrain horizon. |
+| Sun and Earth relative to the horizon | Live Sun and Earth altitude per site, with visibility, time to sunset/sunrise and Earthset/Earthrise judged against the real terrain horizon. Lunarium shows both bodies over that horizon. |
 | Power and communication | Solar power per m² now and over 30 days, daily energy, percentage sunlit and longest darkness. Earth visibility gives the direct-to-Earth window. |
 | Multiple visualizations | A 3D globe, 3D bird's-eye terrain, a 2D shaded-relief map, a first-person 3D view and charts with tables. |
 | Temporal dynamics | A 30-day power timeline, and Lunarium's animated time bar with play, scrub and jump to the next sunrise, sunset, Earthrise or Earthset. |
@@ -62,10 +63,11 @@ Browser (React + three.js, Netlify)
 | Site catalogue (names, agencies, descriptions) | Backend, `data/sites.json` | Live |
 | Solar power, sunrise/sunset | JPL Horizons via the backend | Live |
 | Sun and Earth altitude, visibility, Earthrise/Earthset | JPL Horizons via the backend | Live |
+| Terrain horizon for live visibility and contact windows | NASA LOLA (1.9 km grid) via the backend | Real data |
 | Terrain, elevation, slope, roughness, horizon | NASA LOLA, processed in the browser | Real data |
 | Sun and Earth motion in Lunarium | Geometric model in the browser | Modelled, labelled in the UI |
 
-Live power and visibility use the astronomical horizon, so they don't yet account for terrain blocking the Sun. Lunarium does include terrain. Anything modelled rather than live is labelled in the interface.
+Live Sun and Earth visibility use the terrain horizon from the 1.9 km LOLA grid, so rims smaller than about 2 km are missed; the flat-horizon value is shown alongside for comparison. Solar power still assumes a flat horizon. Anything modelled rather than live is labelled in the interface.
 
 ## Tech stack
 

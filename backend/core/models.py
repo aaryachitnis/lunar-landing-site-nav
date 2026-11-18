@@ -92,6 +92,70 @@ class SkyMetricsResponse(BaseModel):
         le=1.0,
         description="Fraction of the requested future interval with the Sun above the astronomical horizon.",
     )
+    sun_azimuth_degrees: float | None = Field(
+        default=None, description="Sun azimuth at events_from, degrees clockwise from north."
+    )
+    earth_azimuth_degrees: float | None = Field(
+        default=None, description="Earth azimuth at events_from, degrees clockwise from north."
+    )
+
+
+class VisibilityWindow(BaseModel):
+    start: str
+    end: str
+    hours: float
+
+
+class BodyTerrainVisibility(BaseModel):
+    visible: bool = Field(description="Body centre is above the LOLA terrain horizon at events_from.")
+    azimuth_degrees: float
+    terrain_horizon_degrees: float = Field(
+        description="Elevation of the terrain horizon in the body's direction at events_from."
+    )
+    nearest_rise_utc: str | None = None
+    nearest_set_utc: str | None = None
+    visible_fraction: float = Field(ge=0.0, le=1.0)
+    flat_visible_fraction: float = Field(ge=0.0, le=1.0, description="Same, ignoring terrain.")
+    longest_hidden_hours: float = Field(ge=0.0)
+    hidden_by_terrain_hours: float = Field(
+        ge=0.0, description="Hours above the flat horizon but hidden behind terrain."
+    )
+    windows: list[VisibilityWindow] = Field(description="Unbroken visible stretches, events_from to end.")
+
+
+class TerrainSkyResponse(BaseModel):
+    dataset: str
+    resolution_m: float
+    max_range_km: float
+    horizon_profile_degrees: list[float] = Field(
+        description="Terrain horizon elevation for azimuths 0, 1, … 359 degrees."
+    )
+    sun: BodyTerrainVisibility
+    earth: BodyTerrainVisibility
+
+
+class SiteSurfaceRoughness(BaseModel):
+    site_id: str
+    site_name: str
+    mean_slope_deg: float
+    max_slope_deg: float
+    rms_surface_roughness_m: float
+
+
+class SurfaceRoughnessResponse(BaseModel):
+    data_source: str
+    source_url: str
+    resolution_m_at_equator: float
+    analysis_radius_km: float
+    sites: list[SiteSurfaceRoughness]
+
+
+class CommunicationMetricsResponse(BaseModel):
+    site: SiteSummary
+    start: str
+    end: str
+    step: str
+    analysis: dict[str, Any]
 
 
 class PowerMetricsResponse(BaseModel):
@@ -114,6 +178,14 @@ class PowerMetricsResponse(BaseModel):
     sky_error: str | None = Field(
         default=None,
         description="Reason live sky metrics could not be calculated when include_sky=true.",
+    )
+    terrain: TerrainSkyResponse | None = Field(
+        default=None,
+        description="Sun/Earth visibility over the LOLA terrain horizon, when include_terrain=true.",
+    )
+    terrain_error: str | None = Field(
+        default=None,
+        description="Reason terrain-aware metrics could not be calculated when include_terrain=true.",
     )
     instantaneous_power_per_area_W_m2: list[float] = Field(
         description="Power per unit area for each sampled timestep."

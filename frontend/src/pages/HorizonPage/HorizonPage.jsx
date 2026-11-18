@@ -8,6 +8,7 @@ import { useSelectedSite } from '../../hooks/useSelectedSite.js';
 import { useSkyModel } from '../../hooks/useSkyModel.js';
 import { buildTimeline, stateAt, visibilityRuns, nextTransition, fmtHours, WINDOW } from './horizonModel.js';
 import TimeBar from './TimeBar.jsx';
+import { errorText, useAlert, useErrorAlert } from '../../components/MissionAlert/MissionAlert.jsx';
 import './HorizonPage.css';
 
 const DEFAULT_SITE = 'shackleton-rim';
@@ -20,6 +21,14 @@ const COMPASS = Array.from({ length: 24 }, (_, k) => {
   const az = k * 15;
   return { az, label: { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' }[az] ?? String(az) };
 });
+
+const SRC = 'Lunarium · Motion';
+const NO_SENSORS = {
+  level: 'advisory',
+  source: SRC,
+  title: 'No motion sensors on this device',
+  message: 'Motion look-around needs a phone or tablet with a gyroscope. Drag to look around instead, and scroll or pinch to zoom.',
+};
 
 const isMobile = () => window.matchMedia('(pointer: coarse)').matches;
 // Same breakpoint as the compact nav (layouts/AppLayout.css) and the compact HUD (HorizonPage.css).
@@ -55,7 +64,7 @@ export default function HorizonPage() {
   const [speed, setSpeed] = useState(SPEEDS[1].v);
   const [follow, setFollowState] = useState(null);
   const [motion, setMotion] = useState('off'); // off | waiting | on
-  const [toast, setToast] = useState(null);
+  const alert = useAlert();
   const showStats = useMemo(() => new URLSearchParams(location.search).has('stats'), []);
   const [stats, setStats] = useState(null);
 
@@ -239,18 +248,34 @@ export default function HorizonPage() {
       return;
     }
     if (!window.isSecureContext) {
-      setToast('Motion needs HTTPS. On the laptop run "npm run dev:phone" and open the https:// Network URL.');
+      alert({
+        level: 'caution',
+        source: SRC,
+        title: 'Motion needs a secure connection',
+        message: 'Browsers only share device sensors over HTTPS. Drag to look around instead.',
+        detail: import.meta.env.DEV ? 'Dev: run "npm run dev:phone" and open the https:// Network URL.' : undefined,
+      });
       return;
     }
     if (typeof DeviceOrientationEvent === 'undefined') {
-      setToast('This browser has no motion sensors. Drag to look around.');
+      alert(NO_SENSORS);
       return;
     }
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      let granted = false;
       try {
-        if ((await DeviceOrientationEvent.requestPermission()) !== 'granted') return setToast('Motion permission denied.');
+        granted = (await DeviceOrientationEvent.requestPermission()) === 'granted';
       } catch {
-        return setToast('Motion permission denied.');
+        /* treated as denied */
+      }
+      if (!granted) {
+        alert({
+          level: 'caution',
+          source: SRC,
+          title: 'Motion access was denied',
+          message: 'Allow motion and orientation access for this site in your browser settings, then tap Motion again. You can drag to look around meanwhile.',
+        });
+        return;
       }
     }
     setMotion('waiting');
@@ -268,7 +293,7 @@ export default function HorizonPage() {
     window.addEventListener('deviceorientation', onOrient);
     const timer = setTimeout(() => {
       if (first) {
-        setToast('No motion data from this device. Drag to look around.');
+        alert(NO_SENSORS);
         motionCleanup.current?.();
         motionCleanup.current = null;
         setMotion('off');
@@ -278,14 +303,23 @@ export default function HorizonPage() {
       clearTimeout(timer);
       window.removeEventListener('deviceorientation', onOrient);
     };
-  }, []);
+  }, [alert]);
   useEffect(() => () => motionCleanup.current?.(), []);
 
-  useEffect(() => {
-    if (!toast) return;
-    const id = setTimeout(() => setToast(null), 5000);
-    return () => clearTimeout(id);
-  }, [toast]);
+  useErrorAlert(terrain.error, (e) => ({
+    level: 'warning',
+    source: 'Lunarium · Terrain',
+    title: 'Terrain for this site failed to load',
+    message: 'The horizon and 3D surface could not be built. Try another site, or reload the page.',
+    detail: errorText(e),
+  }));
+  useErrorAlert(metrics.error, (e) => ({
+    level: 'warning',
+    source: 'Lunarium · Sky model',
+    title: 'Sun and Earth positions are unavailable',
+    message: 'The sky model could not be computed for this site and time. Try a different time or site.',
+    detail: errorText(e),
+  }));
 
   const pageRef = useRef(null);
   const toggleFullscreen = () => {
@@ -446,8 +480,6 @@ export default function HorizonPage() {
       )}
 
       {loadingMsg && <div className="hz-loading">{loadingMsg}</div>}
-      {(terrain.error || metrics.error) && <div className="hz-loading error">{String((terrain.error || metrics.error).message)}</div>}
-      {toast && <div className="hz-toast">{toast}</div>}
     </div>
   );
 }
