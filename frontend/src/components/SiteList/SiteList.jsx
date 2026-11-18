@@ -16,7 +16,7 @@ export default function SiteList({ sites, selectedId, onSelect, loading, error, 
   }, [sites, query]);
 
   return (
-    <aside className={`site-list${collapsed ? ' collapsed' : ''}`} aria-label="Landing sites">
+    <aside className={`site-list${collapsed ? ' collapsed' : ''}`} aria-label="Landing sites" data-tour="list">
       <button className="site-list-toggle" onClick={onToggle} aria-expanded={!collapsed}>
         {collapsed ? 'Sites ›' : '‹ Hide'}
       </button>

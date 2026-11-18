@@ -39,7 +39,7 @@ export default function MoonView({ sites, selectedSite, onSelect, insets }) {
   }, [selectedSite?.id, sceneRef]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="moon-view">
+    <div className="moon-view" data-tour="globe">
       <div ref={containerRef} className="moon-canvas" />
       <div className="moon-markers" aria-label="Landing sites on the globe">
         {sites.map((s) => {
