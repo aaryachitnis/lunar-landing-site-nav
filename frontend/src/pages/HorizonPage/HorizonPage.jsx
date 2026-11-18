@@ -9,6 +9,8 @@ import { useSkyModel } from '../../hooks/useSkyModel.js';
 import { buildTimeline, stateAt, visibilityRuns, nextTransition, fmtHours, WINDOW } from './horizonModel.js';
 import TimeBar from './TimeBar.jsx';
 import { errorText, useAlert, useErrorAlert } from '../../components/MissionAlert/MissionAlert.jsx';
+import Tour, { useTour } from '../../components/Tour/Tour.jsx';
+import { LUNARIUM_TOUR_STEPS, LUNARIUM_TOUR_STORAGE_KEY } from '../../components/Tour/tourSteps.js';
 import './HorizonPage.css';
 
 const DEFAULT_SITE = 'shackleton-rim';
@@ -45,6 +47,7 @@ export default function HorizonPage() {
   }, []);
   const time = urlTime ?? defaultTime;
 
+  const [touring, setTouring] = useTour(LUNARIUM_TOUR_STORAGE_KEY);
   const { data: sites } = useLunariumSites();
   const { data: site } = useAsync(() => getLunariumSite(siteId), [siteId]);
   const metrics = useSkyModel(site, time);
@@ -193,6 +196,10 @@ export default function HorizonPage() {
   const setFollow = useCallback((body) => {
     const next = followRef.current === body ? null : body;
     sceneRef.current?.setFollow(next);
+  }, []);
+  // Not setFollow: that toggles, and the tour must never turn following off.
+  const onTourStep = useCallback((step) => {
+    if (step.follow && followRef.current !== step.follow) sceneRef.current?.setFollow(step.follow);
   }, []);
 
   useEffect(() => {
@@ -347,7 +354,7 @@ export default function HorizonPage() {
     <div className="horizon-page" ref={pageRef}>
       <div className="horizon-canvas" ref={hostRef} />
 
-      <div className="hz-top-left">
+      <div className="hz-top-left" data-tour="hz-site">
         <select className="hz-chip" value={siteId} onChange={(e) => selectSite(e.target.value)} aria-label="Landing site">
           {!sites?.some((s) => s.id === siteId) && <option value={siteId}>{site?.name ?? siteId}</option>}
           {sites?.map((s) => (
@@ -404,7 +411,7 @@ export default function HorizonPage() {
 
       {now && (
         <>
-          <div className="hz-card" ref={sunCardRef}>
+          <div className="hz-card" ref={sunCardRef} data-tour="hz-sun">
             <div className="hz-card-head">
               <h5>☀ Sun</h5>
               <Status frac={now.sunFrac} />
@@ -480,6 +487,15 @@ export default function HorizonPage() {
       )}
 
       {loadingMsg && <div className="hz-loading">{loadingMsg}</div>}
+      {touring && (
+        <Tour
+          steps={LUNARIUM_TOUR_STEPS}
+          storageKey={LUNARIUM_TOUR_STORAGE_KEY}
+          context={{ siteName: site?.name }}
+          onStep={onTourStep}
+          onClose={() => setTouring(false)}
+        />
+      )}
     </div>
   );
 }

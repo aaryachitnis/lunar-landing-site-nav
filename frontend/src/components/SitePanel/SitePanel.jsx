@@ -5,6 +5,7 @@ import { useSitePower } from '../../hooks/useSitePower.js';
 import { useTerrainPatch } from '../../hooks/useTerrainPatch.js';
 import { formatLat, formatLon, toDMS } from '../../utils/format.js';
 import { MAX_TIME_MS, MIN_TIME_MS, clampTime } from '../../utils/time.js';
+import Hint from '../Hint/Hint.jsx';
 import TerrainView from '../TerrainView/TerrainView.jsx';
 import TimePicker from '../TimePicker/TimePicker.jsx';
 import { PowerTiles, SkyTiles } from '../MetricTiles/MetricTiles.jsx';
@@ -63,7 +64,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
 
   return (
     <aside className="site-panel" aria-label={`${site.fullName} details`}>
-      <header className="panel-header">
+      <header className="panel-header" data-tour="panel">
         <div>
           <div className="panel-badges">
             {site.userAdded ? (
@@ -91,26 +92,44 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
         </div>
       </header>
 
-      <section className="panel-section">
+      <section className="panel-section" data-tour="location">
         <h3>Location</h3>
         <dl className="kv">
-          <dt>Latitude</dt>
+          <dt>
+            Latitude
+            <Hint metric="Latitude" />
+          </dt>
           <dd className="tabular">
             {formatLat(site.lat, 4)} <span className="muted">{toDMS(site.lat, 'N', 'S')}</span>
           </dd>
-          <dt>Longitude</dt>
+          <dt>
+            Longitude
+            <Hint metric="Longitude" />
+          </dt>
           <dd className="tabular">
             {formatLon(site.lon, 4)} <span className="muted">{toDMS(site.lon, 'E', 'W')}</span>
           </dd>
-          <dt>Altitude</dt>
+          <dt>
+            Altitude
+            <Hint metric="Altitude" />
+          </dt>
           <dd className="tabular">{patch ? metres(patch.centerElevationM) : '…'}</dd>
-          <dt>Mean slope</dt>
+          <dt>
+            Mean slope
+            <Hint metric="Mean slope" />
+          </dt>
           <dd className="tabular">{patch ? `${patch.meanSlopeDeg.toFixed(1)}° (central ${Math.round(patch.centralKm)} km)` : '…'}</dd>
-          <dt>Surface roughness</dt>
-          <dd className="tabular" title="RMS height deviation from the best-fit plane, at the elevation grid's km-scale resolution">
+          <dt>
+            Surface roughness
+            <Hint metric="Surface roughness" />
+          </dt>
+          <dd className="tabular">
             {patch ? `${metres(patch.roughnessM)} RMS (central ${Math.round(patch.centralKm)} km)` : '…'}
           </dd>
-          <dt>Patch altitude</dt>
+          <dt>
+            Patch altitude
+            <Hint metric="Patch altitude" />
+          </dt>
           <dd className="alt-stat">
             <span className="segmented" role="group" aria-label="Altitude statistic">
               {ALT_STATS.map(({ key, label }) => (
@@ -137,7 +156,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
         {terrain.error && <p className="field-error">{errorText(terrain.error)}</p>}
       </section>
 
-      <section className="panel-section">
+      <section className="panel-section" data-tour="time">
         <div className="section-head">
           <h3>Time</h3>
           <div className="time-controls">
@@ -152,7 +171,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
         <TimePicker value={time} onChange={onTimeChange} />
       </section>
 
-      <section className="panel-section">
+      <section className="panel-section" data-tour="power">
         <h3>Solar power</h3>
         {power.loading && !power.data && <p className="muted">Fetching ephemeris from JPL Horizons…</p>}
         {power.error && <p className="field-error">{errorText(power.error)}</p>}
@@ -167,7 +186,7 @@ export default function SitePanel({ site, time, onTimeChange, onClose }) {
         </Link>
       </section>
 
-      <section className="panel-section">
+      <section className="panel-section" data-tour="sky">
         <h3>
           Sun &amp; Earth
           <span className="tag-mock is-live" title="JPL Horizons positions, judged against the NASA LOLA terrain horizon">

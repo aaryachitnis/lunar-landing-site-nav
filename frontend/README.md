@@ -37,6 +37,12 @@ Pick a saved site or enter any latitude and longitude, choose an analysis window
 
 Results are live from the backend. If it can't be reached, a clearly labelled mock result is shown instead. A promising location can be added to the site catalogue.
 
+### Guide (`/guide`) and app tour
+
+- **Guide:** explains why landing is a timing problem (Sun, Earth, power) and has a reference for every metric.
+- **Tours:** step-by-step walkthroughs of the Landing Sites page and of Lunarium. Each runs once per browser (Landing Sites skips it when opened from a `?site=` link), and either can be replayed with `?tour=1`, e.g. `/?tour=1` or `/lunarium?tour=1`. Steps live in `components/Tour/tourSteps.js` and point at elements marked `data-tour="…"`. Seen flags are kept in `localStorage` (`lsn:tour-done`, `lsn:lunarium-tour-done`).
+- **Metric hints:** the ⓘ next to each figure in the site panel and Playground shows the same text as the Guide. Both come from `data/metricDocs.js`, keyed by the site panel's label (Playground tiles pass `metric` when their label differs).
+
 ### Shareable links
 
 Each view keeps its state in the URL, and switching tabs carries the site and time across.
@@ -45,6 +51,7 @@ Each view keeps its state in the URL, and switching tabs carries the site and ti
 |---|---|
 | `site` | Site id, e.g. `orig3` (Apollo 11) or a Lunarium id such as `shackleton-rim` |
 | `t` | Selected time, ISO 8601 UTC. Defaults to the current hour. |
+| `tour` | `1` starts that page's tour (Landing Sites, Lunarium). Removed from the URL once read. |
 
 Examples: [`/?site=orig3`](https://lunarsky.select/?site=orig3), [`/lunarium?site=shackleton-rim`](https://lunarsky.select/lunarium?site=shackleton-rim).
 

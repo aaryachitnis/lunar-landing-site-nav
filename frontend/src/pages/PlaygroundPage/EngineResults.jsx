@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatDuration } from '../../utils/format.js';
+import Hint from '../../components/Hint/Hint.jsx';
 import '../../components/MetricTiles/MetricTiles.css';
 import '../../components/PowerChart/PowerChart.css';
 
@@ -13,10 +14,14 @@ const axisProps = {
 const dayTick = (d) => `${Number(d.toFixed(1))} d`;
 const fmt = (v, digits = 0) => v.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-function Tile({ label, value, sub }) {
+// `metric` names the metricDocs entry when the Playground label differs from the site panel's.
+function Tile({ label, metric = label, value, sub }) {
   return (
     <div className="tile">
-      <div className="tile-label">{label}</div>
+      <div className="tile-label">
+        {label}
+        <Hint metric={metric} />
+      </div>
       <div className="tile-value tabular">{value}</div>
       {sub && <div className="tile-sub">{sub}</div>}
     </div>
@@ -69,11 +74,11 @@ export default function EngineResults({ engine, request }) {
   return (
     <div className="pg-engine">
       <div className="tiles">
-        <Tile label="Avg power (24 h)" value={`${fmt(r.average_power_per_24h_W_m2, 1)} W/m²`} sub={`${fmt(r.average_power_per_24h_W_m2 * area)} W for ${fmt(area, area % 1 ? 1 : 0)} m²`} />
-        <Tile label="Avg power (sunlit days)" value={`${fmt(r.average_power_sunlit_days_W_m2, 1)} W/m²`} sub={`${fmt(r.average_power_sunlit_days_W_m2 * area)} W for the array`} />
-        <Tile label="Energy in window" value={`${fmt(derived.totalKwhM2, 2)} kWh/m²`} sub={`${fmt(derived.totalKwhM2 * area, 1)} kWh for the array`} />
+        <Tile label="Avg power (24 h)" metric="Mean power" value={`${fmt(r.average_power_per_24h_W_m2, 1)} W/m²`} sub={`${fmt(r.average_power_per_24h_W_m2 * area)} W for ${fmt(area, area % 1 ? 1 : 0)} m²`} />
+        <Tile label="Avg power (sunlit days)" metric="Mean, sunlit days" value={`${fmt(r.average_power_sunlit_days_W_m2, 1)} W/m²`} sub={`${fmt(r.average_power_sunlit_days_W_m2 * area)} W for the array`} />
+        <Tile label="Energy in window" metric="Energy" value={`${fmt(derived.totalKwhM2, 2)} kWh/m²`} sub={`${fmt(derived.totalKwhM2 * area, 1)} kWh for the array`} />
         <Tile label="Peak power" value={`${fmt(derived.peak, 1)} W/m²`} sub={`${fmt(derived.peak * area)} W for the array`} />
-        <Tile label="Sunlit samples" value={`${Math.round(derived.sunlitFraction * 100)}%`} sub={`of ${power.length} samples (${r.step})`} />
+        <Tile label="Sunlit samples" metric="Sunlit" value={`${Math.round(derived.sunlitFraction * 100)}%`} sub={`of ${power.length} samples (${r.step})`} />
         <Tile label="Longest darkness" value={formatDuration(derived.longestDark)} sub="within the window" />
       </div>
 

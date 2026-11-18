@@ -1,0 +1,19 @@
+.hint { display: inline-flex; vertical-align: middle; }
+.hint-btn {
+  display: inline-grid; place-items: center; width: 14px; height: 14px; padding: 0; margin-left: 5px;
+  font-family: var(--mono); font-size: 9px; font-weight: 700; font-style: italic; line-height: 1;
+  color: var(--text-muted); background: none; border: 1px solid var(--border-strong); border-radius: 50%;
+}
+.hint-btn:hover, .hint-btn[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); }
+/* Bigger hit area on touch without changing the visual size. */
+@media (pointer: coarse) {
+  .hint-btn { position: relative; }
+  .hint-btn::after { content: ''; position: absolute; inset: -10px; }
+}
+.hint-body {
+  position: fixed; z-index: 60; padding: 10px 12px;
+  font-family: var(--font); font-size: 13px; font-weight: 400; line-height: 1.45; letter-spacing: 0; text-transform: none;
+  color: var(--text-primary); background: var(--surface-2);
+  border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: 0 8px 24px #000a, var(--glow);
+  pointer-events: none;
+}
