@@ -5,6 +5,7 @@ import { formatLat, formatLon, toDMS } from '../../utils/format.js';
 import { sanitizeTime } from '../../utils/time.js';
 import { isCalculatedLocationCurrent } from './potentialSite.js';
 import PotentialForm, { FIELD_LABELS, validateForm } from './PotentialForm.jsx';
+import Hint from '../../components/Hint/Hint.jsx';
 import TerrainMap2D from './TerrainMap2D.jsx';
 import EngineResults from './EngineResults.jsx';
 import { errorText, useAlert } from '../../components/MissionAlert/MissionAlert.jsx';
@@ -138,19 +139,31 @@ export default function PlaygroundPage() {
                     {result.site.name}
                     {result.site.backendId && <span className="muted"> · in site list</span>}
                   </dd>
-                  <dt>Latitude</dt>
+                  <dt>
+                    Latitude
+                    <Hint metric="Latitude" />
+                  </dt>
                   <dd className="tabular">
                     {formatLat(result.site.lat, 4)} <span className="muted">{toDMS(result.site.lat, 'N', 'S')}</span>
                   </dd>
-                  <dt>Longitude</dt>
+                  <dt>
+                    Longitude
+                    <Hint metric="Longitude" />
+                  </dt>
                   <dd className="tabular">
                     {formatLon(result.site.lon, 4)} <span className="muted">{toDMS(result.site.lon, 'E', 'W')}</span>
                   </dd>
-                  <dt>Hemisphere</dt>
+                  <dt>
+                    Hemisphere
+                    <Hint metric="Hemisphere" />
+                  </dt>
                   <dd>{result.site.nearSide ? 'Near side (Earth-facing)' : 'Far side'}</dd>
                   <dt>Region</dt>
                   <dd>{result.site.region}</dd>
-                  <dt>Altitude</dt>
+                  <dt>
+                    Altitude
+                    <Hint metric="Altitude" />
+                  </dt>
                   <dd className="tabular">{metres(result.site.altitudeM)}</dd>
                 </dl>
               </article>
@@ -160,17 +173,35 @@ export default function PlaygroundPage() {
                 <div className="pg-terrain">
                   <TerrainMap2D patch={result.terrain} />
                   <dl className="kv pg-terrain-stats">
-                    <dt>Mean slope</dt>
+                    <dt>
+                    Mean slope
+                    <Hint metric="Mean slope" />
+                  </dt>
                     <dd className="tabular">{result.terrain.meanSlopeDeg.toFixed(1)}° <span className="muted">central {Math.round(result.terrain.centralKm)} km</span></dd>
-                    <dt>Roughness</dt>
+                    <dt>
+                    Roughness
+                    <Hint metric="Surface roughness" />
+                  </dt>
                     <dd className="tabular">{metres(result.terrain.roughnessM)} <span className="muted">RMS</span></dd>
-                    <dt>Min altitude</dt>
+                    <dt>
+                    Min altitude
+                    <Hint metric="Patch altitude" />
+                  </dt>
                     <dd className="tabular">{metres(result.terrain.minM)}</dd>
-                    <dt>Mean altitude</dt>
+                    <dt>
+                    Mean altitude
+                    <Hint metric="Patch altitude" />
+                  </dt>
                     <dd className="tabular">{metres(result.terrain.meanM)}</dd>
-                    <dt>Max altitude</dt>
+                    <dt>
+                    Max altitude
+                    <Hint metric="Patch altitude" />
+                  </dt>
                     <dd className="tabular">{metres(result.terrain.maxM)}</dd>
-                    <dt>Relief</dt>
+                    <dt>
+                    Relief
+                    <Hint metric="Relief" />
+                  </dt>
                     <dd className="tabular">{metres(result.terrain.maxM - result.terrain.minM)}</dd>
                   </dl>
                 </div>

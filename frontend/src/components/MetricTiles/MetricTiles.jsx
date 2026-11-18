@@ -1,4 +1,5 @@
 import { formatDeg, formatDuration, formatPct } from '../../utils/format.js';
+import Hint from '../Hint/Hint.jsx';
 import './MetricTiles.css';
 
 /** Yes/No with an icon, so status never relies on colour alone. */
@@ -13,7 +14,10 @@ function YesNo({ ok }) {
 function Tile({ label, value, sub }) {
   return (
     <div className="tile">
-      <div className="tile-label">{label}</div>
+      <div className="tile-label">
+        {label}
+        <Hint metric={label} />
+      </div>
       <div className="tile-value tabular">{value}</div>
       {sub && <div className="tile-sub">{sub}</div>}
     </div>
