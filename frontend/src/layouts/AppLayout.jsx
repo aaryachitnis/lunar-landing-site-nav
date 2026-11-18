@@ -56,6 +56,7 @@ export default function AppLayout() {
           aria-label={open ? 'Close menu' : 'Open menu'}
           aria-expanded={open}
           aria-controls="app-menu"
+          data-tour="nav"
           onClick={() => setOpen((o) => !o)}
         >
           <span />
@@ -66,7 +67,7 @@ export default function AppLayout() {
           <img src={logo} alt="" width="22" height="22" />
           <span>Lunar Site Navigator</span>
         </NavLink>
-        <nav aria-label="Features" className="app-tabs">
+        <nav aria-label="Features" className="app-tabs" data-tour="nav">
           {links}
         </nav>
         <MissionClock />

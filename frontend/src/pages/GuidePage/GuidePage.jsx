@@ -1,186 +1,264 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ENGINE_SETTINGS } from '../../data/api.js';
+import { METRIC_DOCS, METRIC_GROUPS } from '../../data/metricDocs.js';
 import './GuidePage.css';
 
 const { solarIntensityWm2: S, panelEfficiency: EFF } = ENGINE_SETTINGS;
 const flatPanelW = (elevDeg) => Math.round(S * EFF * Math.sin((elevDeg * Math.PI) / 180));
+const MAX_W = flatPanelW(90);
 
-const METRICS = [
-  ['Sun altitude', 'How high the Sun is above a flat horizon, in degrees. Negative means below it.', 'Sets solar power and how long shadows are. At the poles it stays within about ±1.5°.'],
-  ['Sun visible', 'Whether the Sun is above the real skyline (hills and crater rims) right now.', 'Judged against the terrain horizon traced from NASA LOLA elevation. The flat-horizon answer is shown underneath for comparison.'],
-  ['Power now', 'Electrical power a 1 m² flat, horizontal solar panel would make at the selected time.', `Solar intensity ${S} W/m² × ${Math.round(EFF * 100)}% efficiency × sin(Sun altitude).`],
-  ['Energy', 'Total energy that panel would collect over the window shown.', 'Sum of the power curve. Compare sites over the same window.'],
-  ['Mean power / Mean, sunlit days', 'Average power over every 24 h, and over only the days with some sunlight.', 'The gap between them shows how much of the window is spent in darkness.'],
-  ['Sunlit', 'Share of the window where the Sun is above the skyline.', 'Higher means less battery and heater mass to survive the night. Compare with the flat value to see what the terrain costs.'],
-  ['Longest darkness', 'Longest unbroken stretch without sunlight in the window.', 'Drives battery sizing: the lander must survive this on stored energy.'],
-  ['Earth altitude / Earth visible', 'Where Earth sits in the sky and whether it is above the skyline.', 'Earth must be visible for direct-to-Earth radio. Otherwise a relay satellite is needed.'],
-  ['Earth in view / Longest comms gap', 'Share of the window Earth is above the skyline, and the longest stretch it is hidden.', 'The gap is how long the lander must operate without talking to Earth. "Lost to terrain" is time Earth is up but behind a hill.'],
-  ['Terrain horizon', 'How high the skyline rises in the direction of the Sun or Earth.', 'A body is visible only when it is higher than this. From a mountain top it can be below 0°, so you see past the flat horizon.'],
-  ['Mean slope', 'Average steepness of the ground around the site.', 'Landers typically need gentle slopes (a few degrees) to touch down safely.'],
-  ['Surface roughness', 'How bumpy the ground is: RMS height difference from a best-fit plane.', 'Measured at km scale from LOLA, so it misses boulders. Treat it as a regional indicator.'],
+const CHAPTERS = [
+  { id: 'sun', n: '01', title: 'The Sun', blurb: 'At the poles it barely clears the horizon.', icon: <SunIcon /> },
+  { id: 'earth', n: '02', title: 'Earth', blurb: 'Hangs almost still. Sometimes behind a hill.', icon: <EarthIcon /> },
+  { id: 'power', n: '03', title: 'Power', blurb: 'A low Sun means very little power.', icon: <PowerIcon /> },
+  { id: 'metrics', n: '04', title: 'The numbers', blurb: 'What every figure in the app means.', icon: <GaugeIcon /> },
+];
+
+const POWER_ROWS = [
+  { deg: 90, place: 'Equator, noon' },
+  { deg: 45, place: 'Mid-latitudes' },
+  { deg: 10, place: 'High latitudes' },
+  { deg: 1.5, place: 'South pole, best case' },
+];
+
+const VIEWS = [
+  { to: '/', name: 'Landing Sites', text: 'Pick a site on the globe or from the list, then a date. See terrain, solar power and Sun/Earth visibility.' },
+  { to: '/lunarium', name: 'Lunarium', text: 'Stand at the site and watch the Sun and Earth move over the real horizon.' },
+  { to: '/playground', name: 'Playground', text: "Type any coordinates for the same analysis, and save sites worth keeping." },
 ];
 
 export default function GuidePage() {
   const { hash } = useLocation();
+  const [group, setGroup] = useState(METRIC_GROUPS[0].key);
   // Router navigation doesn't scroll to #anchors on its own.
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
   }, [hash]);
+
+  const metrics = Object.entries(METRIC_DOCS).filter(([, d]) => d.group === group);
+
+  // Standard tablist keys: arrows wrap, Home/End jump; focus follows selection.
+  const onTabKey = (e) => {
+    const i = METRIC_GROUPS.findIndex((g) => g.key === group);
+    const n = METRIC_GROUPS.length;
+    const to = { ArrowRight: (i + 1) % n, ArrowLeft: (i - 1 + n) % n, Home: 0, End: n - 1 }[e.key];
+    if (to == null) return;
+    e.preventDefault();
+    const key = METRIC_GROUPS[to].key;
+    setGroup(key);
+    document.getElementById(`tab-${key}`)?.focus();
+  };
 
   return (
     <div className="guide-page">
       <article className="guide">
         <header className="guide-hero">
           <p className="hud-label">Guide</p>
-          <h1>Why landing on the Moon is a timing problem</h1>
+          <h1>Landing on the Moon is a timing problem</h1>
           <p className="guide-lead">
-            A lander runs on sunlight and talks to Earth by radio. On the Moon, both the Sun and Earth move slowly and
-            sometimes hide behind the horizon. Picking a landing site means picking a place <em>and</em> a date where both
-            work for long enough.
+            A lander runs on sunlight and talks to Earth by radio. On the Moon both move slowly and sometimes hide behind
+            the horizon, so picking a site means picking a place <em>and</em> a date where both work for long enough.
           </p>
-          <nav className="guide-toc" aria-label="On this page">
-            <a href="#sun">The Sun</a>
-            <a href="#earth">Earth</a>
-            <a href="#power">Power</a>
-            <a href="#metrics">Reading the numbers</a>
-            <a href="#views">Using the views</a>
-            <a href="#limits">Data and limits</a>
-          </nav>
+          <div className="guide-ctas">
+            <Link className="guide-btn primary" to="/?tour=1">
+              ▶ Take the app tour
+            </Link>
+            <a className="guide-btn" href="#sun">
+              Read the basics ↓
+            </a>
+          </div>
         </header>
 
-        <section id="sun">
-          <h2>1 · The Sun barely rises at the poles</h2>
+        <nav className="guide-chapters" aria-label="Chapters">
+          {CHAPTERS.map((c) => (
+            <a key={c.id} className="chapter-card" href={`#${c.id}`}>
+              <span className="chapter-n tabular">{c.n}</span>
+              <span className="chapter-icon" aria-hidden="true">
+                {c.icon}
+              </span>
+              <span className="chapter-title">{c.title}</span>
+              <span className="chapter-blurb">{c.blurb}</span>
+            </a>
+          ))}
+        </nav>
+
+        <section id="sun" className="guide-section">
+          <SectionHead n="01" title="The Sun barely rises at the poles" />
           <p>
-            The Moon's spin axis is tilted only about 1.5° from upright relative to the Sun. Near the equator the Sun
-            climbs high overhead. At the poles it never climbs more than about 1.5° above a flat horizon, so it circles
-            the sky skimming the ground. A small hill or crater rim can block it completely.
+            The Moon's spin axis is tilted only about 1.5°. Near the equator the Sun climbs high overhead. At the poles it
+            never gets more than about 1.5° above a flat horizon, so it circles the sky skimming the ground, and a small
+            hill or crater rim can block it completely.
           </p>
           <SunPathDiagram />
+          <div className="guide-facts">
+            <Fact value="29.5 d" label="One lunar day" />
+            <Fact value="~14 d" label="Of night at the equator" />
+            <Fact value="±1.5°" label="Sun height at the poles" />
+          </div>
           <p>
-            One lunar day lasts about 29.5 Earth days. Near the equator that means roughly two weeks of sunlight
-            followed by two weeks of night. Near the poles some ridges are lit for most of the year while crater floors
-            nearby never see the Sun at all. Those shadowed floors are where water ice may survive, which is why
-            missions are heading there.
+            Near the poles some ridges are lit for most of the year while crater floors nearby never see the Sun. Those
+            shadowed floors may hold water ice, which is why missions are heading there.
           </p>
           <details>
             <summary>Planner detail</summary>
             <p>
-              The Sun's elevation over a polar site varies by up to ±1.54° over the year (the lunar "seasons") and its
-              azimuth sweeps a full 360° each lunar day. Because the Sun is near the horizon, terrain is everything: the
-              same coordinates can be lit or dark depending on the local horizon profile. The site panel and Lunarium both
-              trace that horizon from NASA LOLA elevation (see <a href="#limits">limits</a>).
+              The Sun's elevation over a polar site varies by up to ±1.54° over the year and its azimuth sweeps a full 360°
+              each lunar day. Because the Sun is near the horizon, terrain is everything: the same coordinates can be lit
+              or dark depending on the local skyline. The site panel and Lunarium both trace that skyline from NASA LOLA
+              elevation (see <a href="#limits">limits</a>).
             </p>
           </details>
         </section>
 
-        <section id="earth">
-          <h2>2 · Earth hangs almost still in the sky</h2>
+        <section id="earth" className="guide-section">
+          <SectionHead n="02" title="Earth hangs almost still in the sky" />
           <p>
-            The Moon always keeps the same face towards Earth, so from any one spot Earth barely moves. It wobbles a few
-            degrees back and forth over the month (called <strong>libration</strong>).
+            The Moon always shows Earth the same face, so from any one spot Earth barely moves. It wobbles a few degrees
+            back and forth over the month, called <strong>libration</strong>. Where you land decides whether it's up.
           </p>
-          <div className="guide-cards">
-            <div className="guide-card">
-              <h3>Near side</h3>
-              <p>Earth is always up. Direct radio contact is available all the time.</p>
-              <Link to="/?site=orig3">See Apollo 11 →</Link>
-            </div>
-            <div className="guide-card">
-              <h3>Poles and edges</h3>
-              <p>Earth sits right on the horizon and bobs above and below it with libration. Contact comes in windows.</p>
-              <Link to="/lunarium?site=shackleton-rim">Stand on Shackleton's rim →</Link>
-            </div>
-            <div className="guide-card">
-              <h3>Far side</h3>
-              <p>Earth is never visible. Missions such as Chang'e 4 need a relay satellite to talk home.</p>
-              <Link to="/?site=orig15">See Chang'e 4 →</Link>
-            </div>
+          <div className="earth-cards">
+            <EarthCard kind="near" title="Near side" text="Earth is always up. Direct radio contact all the time." to="/?site=orig3" cta="See Apollo 11" />
+            <EarthCard
+              kind="limb"
+              title="Poles and edges"
+              text="Earth sits on the horizon and bobs above and below it. Contact comes in windows."
+              to="/lunarium?site=shackleton-rim"
+              cta="Stand on Shackleton's rim"
+            />
+            <EarthCard kind="far" title="Far side" text="Earth is never visible. A relay satellite is needed to talk home." to="/?site=orig15" cta="See Chang'e 4" />
           </div>
         </section>
 
-        <section id="power">
-          <h2>3 · Low Sun, little power</h2>
+        <section id="power" className="guide-section">
+          <SectionHead n="03" title="Low Sun, little power" />
           <p>
-            A flat solar panel catches the most light when the Sun is overhead. When the Sun is low, the same light is
-            spread over a much larger area. With the settings this tool uses ({S} W/m² sunlight, {Math.round(EFF * 100)}%
-            efficient panel):
+            A flat solar panel catches the most light when the Sun is overhead. When it's low, the same light spreads over
+            a much larger area. With this tool's settings ({S} W/m² sunlight, {Math.round(EFF * 100)}% efficient panel):
           </p>
-          <table className="guide-table">
-            <thead>
-              <tr>
-                <th scope="col">Sun altitude</th>
-                <th scope="col">Flat-panel power</th>
-                <th scope="col">Typical place</th>
-              </tr>
-            </thead>
-            <tbody className="tabular">
-              <tr><td>90°</td><td>{flatPanelW(90)} W/m²</td><td>Equator, noon</td></tr>
-              <tr><td>45°</td><td>{flatPanelW(45)} W/m²</td><td>Mid-latitudes</td></tr>
-              <tr><td>10°</td><td>{flatPanelW(10)} W/m²</td><td>High latitudes</td></tr>
-              <tr><td>1.5°</td><td>{flatPanelW(1.5)} W/m²</td><td>South pole, best case</td></tr>
-            </tbody>
-          </table>
+          <ul className="power-bars" aria-label="Flat-panel power by Sun altitude">
+            {POWER_ROWS.map(({ deg, place }) => {
+              const w = flatPanelW(deg);
+              return (
+                <li key={deg}>
+                  <span className="pb-label">
+                    <span className="tabular">{deg}°</span> {place}
+                  </span>
+                  <span className="pb-track" aria-hidden="true">
+                    <span className="pb-fill" style={{ width: `${Math.max(1, (w / MAX_W) * 100)}%` }} />
+                  </span>
+                  <span className="pb-value tabular">{w} W/m²</span>
+                </li>
+              );
+            })}
+          </ul>
           <p>
-            That is why polar landers mount their panels <em>vertically</em> and why lit ridges are so valuable. The figures
-            in this tool are for a flat, horizontal panel. They are best for comparing sites with each other, not for
-            sizing a real array.
+            That's why polar landers mount panels <em>vertically</em> and why lit ridges are so valuable. Figures in this
+            tool are for a flat panel: good for comparing sites, not for sizing a real array.
           </p>
         </section>
 
-        <section id="metrics">
-          <h2>4 · Reading the numbers</h2>
-          <p>What each figure in the site panel and Playground means, and why a mission planner cares.</p>
-          <dl className="guide-glossary">
-            {METRICS.map(([term, plain, detail]) => (
-              <div key={term}>
-                <dt>{term}</dt>
-                <dd>
-                  {plain}
-                  <span className="guide-why">{detail}</span>
-                </dd>
+        <section id="metrics" className="guide-section">
+          <SectionHead n="04" title="Reading the numbers" />
+          <p>
+            What each figure in the site panel and Playground means. In the app, hover or tap the{' '}
+            <span className="inline-hint">i</span> next to any figure for the same text.
+          </p>
+          <div className="metric-tabs" role="tablist" aria-label="Metric groups" onKeyDown={onTabKey}>
+            {METRIC_GROUPS.map((g) => (
+              <button
+                key={g.key}
+                type="button"
+                role="tab"
+                id={`tab-${g.key}`}
+                aria-selected={group === g.key}
+                tabIndex={group === g.key ? 0 : -1}
+                aria-controls="metric-panel"
+                onClick={() => setGroup(g.key)}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+          <div className="metric-grid" id="metric-panel" role="tabpanel" aria-labelledby={`tab-${group}`} tabIndex={0}>
+            {metrics.map(([term, d]) => (
+              <div key={term} className="metric-card">
+                <h3>{term}</h3>
+                <p>{d.text}</p>
               </div>
             ))}
-          </dl>
+          </div>
+          <p className="guide-note">Status (visible, hidden) is always shown with a label or icon as well as colour.</p>
+        </section>
+
+        <section id="views" className="guide-section">
+          <SectionHead n="05" title="Three ways to explore" />
+          <div className="view-cards">
+            {VIEWS.map((v) => (
+              <Link key={v.to} className="view-card" to={v.to}>
+                <span className="view-name">{v.name} →</span>
+                <span>{v.text}</span>
+              </Link>
+            ))}
+          </div>
           <p className="guide-note">
-            Status (visible, partly blocked, hidden) is always shown with a label or icon as well as colour.
+            The site and time live in the address bar, so any view can be shared as a link.{' '}
+            Replay the <Link to="/?tour=1">app tour</Link> or the <Link to="/lunarium?tour=1">Lunarium intro</Link>.
           </p>
         </section>
 
-        <section id="views">
-          <h2>5 · Using the views</h2>
-          <ol className="guide-steps">
-            <li>
-              <strong><Link to="/">Landing Sites</Link></strong>: pick a site on the globe or from the list, then a date.
-              The panel shows terrain, solar power for the next month, and Sun and Earth visibility.
-            </li>
-            <li>
-              <strong><Link to="/lunarium">Lunarium</Link></strong>: stand at the site and watch the Sun and Earth move over
-              the real horizon. Press play, or jump to the next sunrise, sunset, Earthrise or Earthset.
-            </li>
-            <li>
-              <strong><Link to="/playground">Playground</Link></strong>: type any coordinates to get the same analysis for a
-              place that isn't in the list, and save it if it's worth keeping. Saved sites are marked{' '}
-              <em>user-added</em>.
-            </li>
-          </ol>
-          <p className="guide-note">The site and time are in the address bar, so any view can be shared as a link.</p>
-        </section>
-
-        <section id="limits">
-          <h2>6 · Data and limits</h2>
-          <ul>
-            <li>Sun and Earth positions come from NASA JPL Horizons, through this tool's backend.</li>
-            <li>Terrain, slope and roughness come from NASA LRO LOLA elevation: about 1.9 km per pixel globally and 5 m at key polar sites.</li>
-            <li>
-              Live Sun and Earth visibility use the terrain horizon from the 1.9 km LOLA grid, out to 150 km. Rims smaller
-              than about 2 km are not captured, and solar power figures still assume a flat horizon.
-            </li>
-            <li>Lunarium's Sun and Earth motion is a geometric model, labelled as modelled in that view.</li>
-            <li>User-added sites are not checked; treat their names and coordinates as unverified.</li>
+        <section id="limits" className="guide-section">
+          <SectionHead n="06" title="Data and limits" />
+          <ul className="limits">
+            <li><strong>Sun and Earth positions</strong> come from NASA JPL Horizons, through this tool's backend.</li>
+            <li><strong>Terrain, slope and roughness</strong> come from NASA LRO LOLA elevation: about 1.9 km per pixel globally and 5 m at key polar sites.</li>
+            <li><strong>Visibility</strong> uses the terrain horizon from the 1.9 km grid, out to 150 km. Rims smaller than about 2 km aren't captured, and power figures still assume a flat horizon.</li>
+            <li><strong>Lunarium's</strong> Sun and Earth motion is a geometric model, labelled as modelled in that view.</li>
+            <li><strong>User-added sites</strong> aren't checked; treat their names and coordinates as unverified.</li>
           </ul>
         </section>
       </article>
+    </div>
+  );
+}
+
+function SectionHead({ n, title }) {
+  return (
+    <h2 className="section-head-guide">
+      <span className="tabular">{n}</span>
+      {title}
+    </h2>
+  );
+}
+
+function Fact({ value, label }) {
+  return (
+    <div className="fact">
+      <span className="fact-value tabular">{value}</span>
+      <span className="fact-label">{label}</span>
+    </div>
+  );
+}
+
+/** Small sky sketch: where Earth sits relative to the horizon for each kind of site. */
+function EarthCard({ kind, title, text, to, cta }) {
+  const earthY = { near: 26, limb: 50, far: null }[kind];
+  return (
+    <div className="earth-card">
+      <svg viewBox="0 0 160 70" aria-hidden="true">
+        <rect x="0" y="0" width="160" height="56" className="ec-sky" />
+        {earthY != null && <circle cx="80" cy={earthY} r="9" className="ec-earth" />}
+        {kind === 'limb' && <path d="M80 36 v-10 M80 64 v-6" className="ec-wobble" />}
+        <path d="M0 56 L56 56 L70 50 L84 56 L160 56 L160 70 L0 70 Z" className="ec-ground" />
+        {kind === 'far' && (
+          <text x="80" y="34" textAnchor="middle" className="ec-note">
+            no Earth
+          </text>
+        )}
+      </svg>
+      <h3>{title}</h3>
+      <p>{text}</p>
+      <Link to={to}>{cta} →</Link>
     </div>
   );
 }
@@ -214,5 +292,41 @@ function SunPathDiagram() {
         </g>
       </svg>
     </figure>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 40 40">
+      <path d="M4 30 H36" className="ic-line" />
+      <circle cx="20" cy="27" r="6" className="ic-sun" />
+      <path d="M20 14 v4 M10 19 l3 3 M30 19 l-3 3" className="ic-ray" />
+    </svg>
+  );
+}
+function EarthIcon() {
+  return (
+    <svg viewBox="0 0 40 40">
+      <circle cx="20" cy="17" r="8" className="ic-earth" />
+      <path d="M4 30 L14 30 L18 26 L22 30 L36 30" className="ic-line" />
+    </svg>
+  );
+}
+function PowerIcon() {
+  return (
+    <svg viewBox="0 0 40 40">
+      <path d="M8 30 L32 30 L28 20 L12 20 Z" className="ic-panel" />
+      <path d="M20 20 V30 M10 25 H30" className="ic-line" />
+      <path d="M21 6 L16 15 H22 L19 22" className="ic-ray" />
+    </svg>
+  );
+}
+function GaugeIcon() {
+  return (
+    <svg viewBox="0 0 40 40">
+      <path d="M8 28 A12 12 0 0 1 32 28" className="ic-line" />
+      <path d="M20 28 L27 18" className="ic-ray" />
+      <circle cx="20" cy="28" r="2" className="ic-dot" />
+    </svg>
   );
 }

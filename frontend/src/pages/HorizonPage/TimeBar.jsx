@@ -20,7 +20,7 @@ export default function TimeBar({ timeline, now, sunRuns, earthRuns, playing, on
   const ticks = [0, 24, 48, 72].map((h) => ({ h, ms: timeline.t0 + h * 3.6e6 }));
 
   return (
-    <div className="hz-timebar">
+    <div className="hz-timebar" data-tour="hz-time">
       <div className="hz-tb-controls">
         <div className="hz-tb-group">
           <button className="hz-btn primary" onClick={onPlay} aria-label={playing ? 'Pause' : 'Play'}>
